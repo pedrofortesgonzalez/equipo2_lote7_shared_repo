@@ -7,17 +7,17 @@ En este repositorio, escribiremos el código destinado a resolver la Actividad G
 *********************************************************************************************
 *********************************************************************************************
 *********************************************************************************************
-# Actividad grupal: Algoritmos e IA
+### Actividad grupal: Algoritmos e IA
 *********************************************************************************************
 ******************************************************************************************************************************************************************************************
 *********
-## Task 1 --> Jon
+#### Task 1 --> Jon
 - Generar un solo dataframe cuyas columnas se correspondan con el nombre del gen, el nombre de las filas con el ID (identification) de cada muestra y donde se incluya la columna con la clase de cada muestra.
 - Imputación de los datos NA.
 - Otros métodos de procesamiento de las muestras escogidos por el estudiante después explorar los datos.
 
 **********
-## Task 2: USL --> Xos
+#### Task 2: USL --> Xos
 Implementación de cuatro métodos de aprendizaje no supervisado: dos de reducción de dimensionalidad y dos de clusterización. 
 ###### Reducir dimensiones
 - PCA
@@ -28,19 +28,18 @@ Implementación de cuatro métodos de aprendizaje no supervisado: dos de reducci
 - 1 jerárquico (a elegir)
 
 *********
-## Task 3
+#### Task 3: SL --> Cristina
 Implementación de tres métodos de aprendizaje supervisado
-#### SL --> Cristina
 - Random Forest
 - SVM (lineal, radial, poly...??)
 - RDA
 
 *********
-## Task 4 --> Pedro
+#### Task 4 --> Pedro
 Cálculo de diferentes métricas de evaluación: matriz de confusión, precisión, sensibilidad, especificidad y score-F1. 
 
 *********
-## Task 5 --> Aurora
+#### Task 5 --> Aurora
 Responder preguntas con respuestas cortas.
 
 **1. Procesamiento de los datos (0,5 puntos):**
