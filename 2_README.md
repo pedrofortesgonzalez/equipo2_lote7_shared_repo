@@ -2,15 +2,15 @@
 
 *Repositorio creado para la actividad grupal de Introducción a la Programación Científica*.
 
+#### Propósito
 En este repositorio, escribiremos el código destinado a resolver la Actividad Grupal de la asignatura Algoritmos e IA.
-
-*********************************************************************************************
-*********************************************************************************************
-*********************************************************************************************
+***
+***
+***
 ### Actividad grupal: Algoritmos e IA
-*********************************************************************************************
-******************************************************************************************************************************************************************************************
-*********
+***
+***
+***
 #### Task 1 --> Jon
 - Generar un solo dataframe cuyas columnas se correspondan con el nombre del gen, el nombre de las filas con el ID (identification) de cada muestra y donde se incluya la columna con la clase de cada muestra.
 - Imputación de los datos NA.
