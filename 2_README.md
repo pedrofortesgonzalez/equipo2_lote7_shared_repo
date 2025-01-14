@@ -24,8 +24,9 @@ Implementación de cuatro métodos de aprendizaje no supervisado: dos de reducci
 - t-SNE
 
 ###### Clusterización
-- 1 no jerárquico
-- 1 jerárquico (a elegir)
+Elegir una de las siguientes opciones
+- *Opción 1*: 1 no jerárquico (a elegir) y 1 jerárquico (a elegir)
+- *Opción 2*: 2 del mismo tipo (a elegir)
 
 *********
 #### Task 3: SL --> Cristina
