@@ -379,8 +379,10 @@ analisis_df
 # 5.PREGUNTAS SOBRE LA ACTIVIDAD -----------------------------------------------
 ## 1. Procesamiento de los datos (0,5 puntos):
 ### ¿Qué método habéis escogido para llevar a cabo la imputación de los datos? Razonad vuestra respuesta. (0,3 puntos).
+### Aunque no se aplicó un método de imputación de datos en su sentido estricto, se procesaron los datos para eliminar datos faltantes. Primero se verificaron la existencia de valores
+### NA, infinitos y ceros. Tras hallar ciertas variables cuyas columnas sumaban un total de cero, estas fueron eliminadas del conjunto de datos final.
 ### ¿Habéis llevado a cabo algún otro tipo de procesamiento? Razonad vuestra respuesta. (0,2 puntos).
-
+###  No se llevó a cabo ningún otro tipo de procesamiento de los datos, puesto que estos ya contaban con la estructura necesaria para su uso y eran válidos para la aplicación de las técnicas utilizadas.
 
 ## 2.Métodos no supervisados (1 punto):
 ### ¿Cuál es el motivo por el cual habéis seleccionado estas técnicas de reducción de dimensionalidad? (0,3 puntos).
