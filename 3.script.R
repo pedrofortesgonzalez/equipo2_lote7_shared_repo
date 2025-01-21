@@ -393,8 +393,39 @@ analisis_df
 
 ## 3.Métodos supervisados (1,75 puntos):
 ### ¿Cuál es el motivo por el cual habéis seleccionado ambas técnicas de aprendizaje supervisado? ¿Cuál ha dado mejores resultados a la hora de clasificar las muestras? Razonad vuestra respuesta (1 punto).
+# Por un lado, decidimos usar un método de análisis de la discriminante, concretamente el RDA (análisis de la discriminante regularizada). Este método lo que hace es, a partir de un conjunto de variables predictoras, generar una función discriminante, que permite clasificar las observaciones según las clases establecidas por la variable categórica (variable dependiente). 
+# Concretamente, el RDA es un método muy adecuado cuando los datos tienen relaciones lineales y se quiere evitar el sobreajuste, ya que tiene dos parámetros de regularización (gamma y lambda) que penaliza las variables con colinealidad. 
+#También decidimos usar el método Support Vector Machine (SVM). En este caso, para la clasificación, este algoritmo se basa en el cálculo de hiperplanos, que permiten la separación entre clases. Estos hiperplanos pueden constituirse a partir de funciones lineales o funciones de tipo kernel. 
+#Como el RDA daba una buena precisión, consideramos que los datos se podían separar con funciones lineales y por ello decidimos usar para el SVM su forma lineal. 
+#Finalmente, usamos Random Forest, que es una técnica más robusta que las anteriores, ya que combina el poder predictivo de muchos modelos individuales (árboles de decisión). 
+#Consideramos apropiado comparar la capacidad predictiva de modelos más simples (RDA y SVM) con un modelo más complejo como el Random Forest. 
+#Además, Random Forest también contempla relaciones no lineales de los datos, un aspecto que no tuvimos en cuenta con los dos modelos anteriores. 
+# Los resultados fueron para los tres algoritmos, una precisión bastante elevada (0,99 para el RDA, 0,84 para el SVM y 0,99 para el Random Forest). 
+# A parte de la precisión, también calculamos el área bajo la curva. Aunque realmente no se podían generar ni curvas ROC ni curvas PR ya que se trataba de un problema multiclase, usamos la función multiclass.roc(), que calcula una curva ROC para cada nivel de la variable categórica y luego hace un promedio. 
+#Esta función no permite obtener un resultado gráfico, pero sí un valor de área bajo la curva (AUC) promedio. Para los tres modelos, este área estaba muy próxima a 1, por lo que los tres son muy eficientes a la hora de hacer la clasificación. 
+
 ### ¿Habéis considerado oportuno implementar algún método de reducción de dimensionalidad para procesar los datos antes de implementarlos en dichas técnicas? ¿Por qué? (0,5 puntos).
+# Consideramos tanto la posibilidad de usar los resultados de los algoritmos de reducción de la dimensionalidad como pre-procesado para los algoritmos de aprendizaje supervisado, como el uso de métodos de regularización (LASSO, RIDGE, Elastic Net). 
+# Llegamos a la conclusión de, en muchos casos, los resultados de los métodos de aprendizaje no supervisado son difícilmente interpretables, ya que, en muchos casos, al proyectar los datos de un espacio de mayor dimensión a uno de menor dimensión, el resultado son un conjunto de variables, diferentes a las originales, y difíciles de comprender y extraer un significado biológico.
+# Por ello, en su lugar, decidimos usar un método de regularización, para quedarnos solo con un subconjunto de todas las variables originales. 
+# De entre los métodos de regularización que existen, decidimos usar LASSO, puesto que aplica una penalización más intensa y con ella conseguimos seleccionar 104 variables, con respecto a los 500 originales, reduciendo considerablemente la dimensionalidad y quedándonos solo con las variables más relevantes a la hora de hacer la clasificación. 
+
 ### ¿Qué aspectos positivos y negativos tienen cada una de las técnicas que habéis escogido? (0,25 puntos).
+# RDA:
+#Aspectos positivos:
+# Buen rendimiento para datos con relaciones lineales / Previene sobreajuste y problemas de multicolinealidad.
+#Aspectos negativos:
+#Asume una distribución normal de los datos / No es adecuado para problemas de clasificación con patrones no lineales.
+#SVM:
+#Aspectos positivos:
+# Efectivo en espacios de alta dimensión /Admite funciones lineales y funciones tipo kernel.
+# Aspectos negativos:
+#Coste computacional /Puede ser difícil elegir la función óptima para cada caso / Puede ser difícil determinar el hiperparámetro C más adecuado.
+#Random Forest:
+#Aspectos positivos:
+# Combina el poder predictivo de modelos individuales para generar un modelo final más robusto / Menos sensible a la presencia de datos atípicos. 
+#Aspectos negativos:
+#Coste computacional / Potencial sobreajuste / Falta de interpretabilidad
 
 ## 4.De estas cuatro opciones, ¿qué tipo de arquitectura de deep learning sería la más adecuada para procesar datos de expresión génica? Razonad vuestra respuesta (0,25 puntos).
 ### a) Red de perceptrones (multiperceptron layers).
