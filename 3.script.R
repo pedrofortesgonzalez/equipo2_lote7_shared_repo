@@ -400,3 +400,8 @@ analisis_df
 ### c) Redes recurrentes.
 ### d) Redes de grafos.
 
+### La respuesta correcta es la opción A); la red de perceptrones es la arquitectura deep learning más utilizada en el ámbito y es más adecuada a la estructura y naturaleza de los datos. Estos están separados por tabulaciones y  componen una matriz de datos de expresión génica (vectores) y metadatos (que pueden codificarse para que el algoritmo lo comprenda). 
+### El resto de arquitecturas no son adecuadas:
+### Redes convolucionales: Destaca por el procesado de estructuras espaciales (imágenes o datos 2D/3D), los datos de expresión génica carecen de esta estructura.
+### Redes recurrentes: Destaca por el procesado de datos secuenciales o temporales, puesto que aprenden en cada secuencia de procesado. En los datos de expresión génica generales no se cuenta con esta relación (a menos que sean estudios longitudinales).
+### Redes de grafos: Destaca por el procesado de datos estructurados entre nodos, en el ámbito de la expresión génica podría visualizarse las relaciones entre genes, siendo estos los nodos y las relaciones las conexiones. Sin embargo, sólamente con datos de expresión génica no puede emplearse esta arquitectura.
