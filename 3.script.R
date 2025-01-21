@@ -386,9 +386,70 @@ analisis_df
 
 ## 2.Métodos no supervisados (1 punto):
 ### ¿Cuál es el motivo por el cual habéis seleccionado estas técnicas de reducción de dimensionalidad? (0,3 puntos).
+
+###Motivo de Elección del PCA: Hemos seleccionado el Análisis de Componentes Principales (PCA) buscando una combinacion
+###lineal de las variables objeto de estudio maximizando la varianza de los datos, y que minimice la correlacion entre ellas. 
+###Además esta técnica se ordena en función de su varianza, es decir, que se ordena en funcion de cuánto se separan o desvían
+###los valores individuales de un conjunto respecto a su media.
+
+###Mótivo de Elección del t-SNE: es muy eficaz para reducir la dimensionalidad de los datos y, al mismo tiempo, mantener las relaciones
+###locales entre los puntos. En el caso de los genes en cáncer de mama, las interacciones son bastante complejas y no siempre siguen un 
+###patrón lineal.
+
+
 ### ¿Cuál es el motivo por el cual habéis seleccionado estas técnicas de clusterización? (0,3 puntos).
+
+###Clustering Jerárquico (Método DIANA): El código implementa el clustering divisivo utilizando el algoritmo DIANA con dos métricas de distancia 
+###distintas: euclidiana y Manhattan. La distancia euclidiana mide la "distancia directa" entre puntos en un espaco multidimensional. La distancia Manhattan,
+###que calcula las diferencias absolutas entre las coordenadas de los puntos en cada dimensión. 
+
+###K-means: permite dividir los datos en un número específico de grupos (k), lo que es útil cuando se tiene una idea previa de la cantidad de clústeres 
+###esperados. Es eficiente para conjuntos de datos grandes y produce particiones claras, lo que facilita el análisis
+
+
 ### En ambos casos, ¿qué aspectos positivos y negativos tienen cada una? (0,2 puntos).
+
+### Aspectos positivos del clustering jerárquico (DIANA):
+
+### A diferencia de métodos como K-means, no es necesario predefinir el número de grupos, lo que lo hace más flexible.
+
+### La representación gráfica mediante dendrogramas facilita la interpretación de los resultados, ya que muestra cómo los clústeres
+### se agrupan a medida que se dividen.
+
+### Aspectos negativos del clustering jerárquico (DIANA):
+
+### Este método puede ser computacionalmente costoso para grandes conjuntos de datos, lo que puede dificultar su aplicación en estudios de expresión 
+### génica a gran escala.
+
+### El clustering jerárquico puede verse afectado por valores atípicos o ruido en los datos, lo que puede hacer que los clústeres no reflejen correctamente 
+### las relaciones biológicas subyacentes.
+
+### Aunque no se debe predefinir el número de clústeres, puede ser complicado determinar el nivel adecuado de corte en el dendrograma para obtener una 
+### partición óptima de los clústeres.
+
+### Aspectos positivos del clustering no jerárquico (K-means):
+
+### K-means es fácil de entender y rápido de ejecutar, incluso con grandes conjuntos de datos. Esto lo convierte en una opción popular para explorar grandes volúmenes de datos de expresión génica.
+
+### A diferencia del clustering jerárquico, K-means permite predefinir el número de clústeres a formar. Esto puede ser útil cuando se tiene una idea previa del número de subgrupos que se desean identificar.
+
+### El algoritmo es eficiente desde el punto de vista computacional, lo que permite aplicarlo en grandes conjuntos de datos sin que se vuelva un cuello de botella en el proceso.
+
+### Limitaciones clustering no jerárquico (K-means):
+
+### K-means requiere que el número de clústeres se especifique de antemano. Elegir el valor correcto para K puede ser complicado y no siempre refleja la estructura subyacente de los datos.
+
+### K-means es sensible a los valores atípicos (outliers), que pueden distorsionar los centroides y afectar los resultados del agrupamiento.
+
+### K-means funciona mejor cuando los clústeres son de forma esférica y tienen varianzas similares. Si los clústeres tienen formas complejas o distribuciones muy diferentes, los resultados pueden no ser satisfactorios.
+
+
 ### En el caso de la clusterización, ¿podéis afirmar con certeza que los clústeres generados son los mejores posibles? Razonad vuestra respuesta. (0,2 puntos).
+
+###No se puede afirmar con certeza que los clústeres generados sean los mejores posibles, ya que la calidad de la clusterización depende de varios factores, como el algoritmo utilizado, los parámetros seleccionados 
+### (por ejemplo, el número de clústeres en k-means) y las características inherentes de los datos. Además, algunos algoritmos, como k-means, asumen que los clústeres son esféricos y de tamaño 
+###similar, lo cual puede no ajustarse a la distribución real de los datos. Aunque se han utilizan métricas como el método del codo o el índice de silueta para evaluar la calidad, estas no garantizan 
+### que los resultados sean óptimos ni que representen la estructura subyacente de los datos de manera perfecta.
 
 
 ## 3.Métodos supervisados (1,75 puntos):
