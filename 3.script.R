@@ -1,7 +1,7 @@
 # 1-PRE-PROCESADO --------------------------------------------------------------
 ## 1.1. WEnV -------------------------------------------------------------------
 rm(list=ls()) # resetear WEnv
-path <- "/Users/pedrofortesgonzalez/Desktop/MASTER_UNIR/11_ALGORITMOS_IA/actividades/Act3_grupal/Material complementario"
+path <- ""
 setwd(path)
 
 # Librerías y random seed
@@ -20,9 +20,9 @@ library(factoextra)  # Herramientas para calcular y visualizar resultados de clu
 library(cluster)     # Incluye métodos de clustering como k-means, clustering jerárquico (agnes), y divisivo (DIANA).
 
 ## Estructurar df---------------------------------------------------------------
-clases <- read.csv("./1_data/classes.csv", header = FALSE, sep = ";", col.names = c("Muestra", "Clase"), row.names = 1)
+clases <- read.csv("classes.csv", header = FALSE, sep = ";", col.names = c("Muestra", "Clase"), row.names = 1)
 columnas <- read_lines("1_data/column_names.txt")
-gen_exp <-read.csv("1_data/gene_expression.csv", header = FALSE, sep = ";", col.names = (columnas))
+gen_exp <-read.csv("gene_expression.csv", header = FALSE, sep = ";", col.names = (columnas))
 gen_exp <- scale(gen_exp, center = TRUE, scale=TRUE)  # Normalizamos datos de expresión génica
 df <- cbind(clases, gen_exp)
 df$Clase <- as.factor(df$Clase) # convertir variable clase a factor
