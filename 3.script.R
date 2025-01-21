@@ -377,3 +377,26 @@ analisis_df
 
 
 # 5.PREGUNTAS SOBRE LA ACTIVIDAD -----------------------------------------------
+## 1. Procesamiento de los datos (0,5 puntos):
+### ¿Qué método habéis escogido para llevar a cabo la imputación de los datos? Razonad vuestra respuesta. (0,3 puntos).
+### ¿Habéis llevado a cabo algún otro tipo de procesamiento? Razonad vuestra respuesta. (0,2 puntos).
+
+
+## 2.Métodos no supervisados (1 punto):
+### ¿Cuál es el motivo por el cual habéis seleccionado estas técnicas de reducción de dimensionalidad? (0,3 puntos).
+### ¿Cuál es el motivo por el cual habéis seleccionado estas técnicas de clusterización? (0,3 puntos).
+### En ambos casos, ¿qué aspectos positivos y negativos tienen cada una? (0,2 puntos).
+### En el caso de la clusterización, ¿podéis afirmar con certeza que los clústeres generados son los mejores posibles? Razonad vuestra respuesta. (0,2 puntos).
+
+
+## 3.Métodos supervisados (1,75 puntos):
+### ¿Cuál es el motivo por el cual habéis seleccionado ambas técnicas de aprendizaje supervisado? ¿Cuál ha dado mejores resultados a la hora de clasificar las muestras? Razonad vuestra respuesta (1 punto).
+### ¿Habéis considerado oportuno implementar algún método de reducción de dimensionalidad para procesar los datos antes de implementarlos en dichas técnicas? ¿Por qué? (0,5 puntos).
+### ¿Qué aspectos positivos y negativos tienen cada una de las técnicas que habéis escogido? (0,25 puntos).
+
+## 4.De estas cuatro opciones, ¿qué tipo de arquitectura de deep learning sería la más adecuada para procesar datos de expresión génica? Razonad vuestra respuesta (0,25 puntos).
+### a) Red de perceptrones (multiperceptron layers).
+### b) Redes convolucionales.
+### c) Redes recurrentes.
+### d) Redes de grafos.
+
