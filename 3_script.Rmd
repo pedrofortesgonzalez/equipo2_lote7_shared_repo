@@ -10,6 +10,8 @@ knitr::opts_chunk$set(echo = TRUE, message = TRUE, warning = FALSE)
 ```
 
 # 0.WEnv
+El primer paso siempre resetear el entorno de trabajo, cargar el fichero con el que se va a trabajar (en este caso "Dataset expresión genes.csv") y cargar todas las librerías que van a ser necesarias para el análisis. 
+
 ```{r}
 rm(list=ls()) #resetear WEnv
 thisfile_path <- file.choose() #elegir
@@ -24,6 +26,8 @@ library(pheatmap) #heatmaps
 library(gtsummary) #tabla est.descriptiva
 library(MASS) 
 library(glmnet)
+library(ggplot2)
+library(gridExtra)
 ```
 
 
@@ -36,40 +40,140 @@ df_nogenes <- df %>% dplyr::select(-starts_with("AQ_")) # df solo de los genes
 ```
 
 
-# 2.PCA
+# 2.*PCA*
+
+##**Introducción y metodología**
+
+El Análisis de Componentes Principales (PCA) es un método de reducción de la dimensionalidad muy utilizado, sobretodo para conjuntos de datos con relaciones lineales. El objetivo de este modelo es reducir la complejidad de un conjunto de variables observadas, identificando una serie de componentes principales que explican la mayor parte de la variabilidad en los datos originales. En este modelo se asume que cada componente se forma por la combinación lineal de todas las variables del modelo y cada una tiene una determinada carga que indica si contribuye más o menos al componente y su dirección de contribución.
+
+En este ejemplo, el objetivo era aplicar un PCA sobre las variables de expresión génica del dataset, para luego determinar el número de componentes óptimo para explicar la mayor parte de los datos (un 70% de variaza) y darle un sentido biológico a esos componentes principales. 
+
+Para aplicar el PCA en R, se puede usar la función prcomp() de la librería stats:
+
 ```{r}
 pca.result <- prcomp(df_genes, center = TRUE, scale = TRUE )
-pca.result$x
 ```
 
+##**Análisis y gráficos**
+**A-Elección del número de componentes principales**
 
-# 3.Gráficos descriptivos PCA
-## 3.1.¿Cuántos Componentes principales elegimos?
+En el PCA se generan muchos componentes principales y es fundamental elegir el número óptimo para el análisis. Existen diferentes criterios para elegir este número de componentes principales. Uno de ellos sería analizar la varianza explicada por cada componente principal y buscar el número de componentes donde la varianza acumulada sea adecuada (en este caso hemos elegido un 70%):
+
 ```{r}
-#Si miramos los eigenvalues:
 eigenvalues <- get_eigenvalue(pca.result)
-eigenvalues # Si cogemos las primeras 5 PCs, explicamos > 70% de la varianza > confirmamos con el gráfico
-fviz_eig(pca.result, addlabels = TRUE) #
-fviz_pca_var(pca.result, col.var = "cos2", gradient.cols = c("blue","yellow", "red"), repel = TRUE) #variables segun calidad cos2
-
-# Contribución de variables a los distintos PCs
-fviz_contrib(pca.result, choice ="var", axes = 1, top = 20) #variables que mas influyen a la dimension 1
-fviz_contrib(pca.result, choice ="var", axes = 2, top = 20) #variables que mas influyen a la dimension 2
-fviz_contrib(pca.result, choice ="var", axes = 3, top = 20) #variables que mas influyen a la dimension 3
+eigenvalues 
 ```
 
+Con este método, habría que coger al menos 5 componentes principales. Otra opción es generar un scree plot y buscar el punto de allanamiento de la gráfica:
 
-## 3.2.Clusterizacion
-La hacemos para intentar agrupar variables según PCs
 
-### kmeans con 2 centroides
 ```{r}
-kmeans2 <- kmeans(t(df_genes), centers = 2) # hacer clusterización kmeans con 3 clusters
-kmeans2$cluster <- as.factor(kmeans2$cluster) # castear variable cluster
-summary(kmeans2$cluster)
-
-fviz_pca_var(pca.result, col.var = kmeans2$cluster, color.var = cluster_colors, legend.title ="Cluster", repel = TRUE)
+fviz_eig(pca.result, addlabels = TRUE) 
 ```
+
+En el gráfico, se observa que  el allanamiento de la gráfica ocurre en el segundo componente, ya que el componente principal explica gran parte de la varianza (52,5%) y el resto de componentes aportan mucha menos varinza. Sin embargo, como consideramos importante llegar a un 70% de varianza, decidimos trabajar con los cinco primeros componentes principales. 
+
+**B-Análisis de las variables y los componentes**
+
+Podemos representar, en dos dimensiones, las variables del dataset, en forma de flechas, cuya longitud indica la fuerza con la que las variables constribuyen a cada dimensión y cuya dirección indica si la asociación es positiva o negativa. 
+Además, podemos establecer un código de colores, de modo que se represente simultáneamente el parámetro cos2. Este parámetro indica qué tan bien están representadas las variables por los componentes principales, en otras palabras, establece cómo de bien "caben" las variables en el espacio de menor dimensión. 
+
+```{r}
+fviz_pca_var(pca.result, col.var = "cos2", gradient.cols = c("blue","yellow", "red"), repel = TRUE, axes = c(1,2),
+             title = "Cos2 de variables en PC1 y PC2")
+```
+
+En el gráfico, se puede apreciar como  casi todas las variables se ajustan bien al epacio de menor dimension,menos algunos genes como ADIPOQ o NOX5.
+Además, en ese gráfico también se observa la tendencia que tienen muchas variables a asociarse negativamente y con bastante fuerza a la dimensión 2. 
+
+Este código de colores se puede establecer también según otros criterios. Por ejemplo, se puede aplicar un algoritmo de clusterización, para intentar agrupar las variables:
+
+```{r}
+kmeans <- kmeans(t(df_genes), centers = 2)
+
+clusters <- list()
+
+for (i in 1:4) {
+  
+  cluster.plot <- fviz_pca_var(pca.result, col.var = kmeans$cluster, gradient.cols = c("blue","green", "red"), axes = c(i,i+1), 
+                               legend.title ="Clusterizacion", repel = TRUE) 
+  clusters[[i]] <- cluster.plot
+}
+
+todos.clusters <- grid.arrange(grobs = clusters, nrow = 3)
+todos.clusters
+```
+
+En estas gráficas, se ha representado la fuerza y la dirección de las variables con distintas combinaciones de pares de dimensiones. Para la dimensión 2 se observa la tendencia que tienen las variables de asociarse de forma negativa e intensa, unna tendencia que no se aprecia para el resto de dimensiones, donde hay mucha heterogeneidad. Por otro lado, la clusterización no ha sido eficiente, ya que prácticamente todas las variales se agrupan en el mismo cluster, mientras que queda una pareja de variables en otro cluster, que coincide con las variables con un menor cos2, es decir, este grupo consiste en las variables que peor se ajustan al modelo. Sería interesante probar otros algoritmos de clusterización (Asignatura de Algoritmos, tema 4) para analizar si alguno de ellos permite una agrupación más óptima de las variables. No lo hemos estudiado porque hemos considerado que no era el objetivo de la actividad. 
+
+Para dar un sentido y un nombre a los 5 componentes principales elegidos, hemos analizado las variables que más contribuyen a cada uno de estos componentes:
+
+```{r}
+graficos <- list()
+for (i in 1:5) {
+  grafico <- fviz_contrib(pca.result, choice ="var", axes = i, top = 5) 
+  graficos[[i]] <- grafico
+}
+
+graficos_varianza <- grid.arrange(grobs = graficos, nrow = 3)
+```
+Tras una búsqueda de estos genes en bases de datos como GenBank, se ha determinado que:
+1) El componente 1 está relacionado con alteraciones en procesos inflamatorios, de respuesta inmune y estrés celular. 
+
+2) El componente 2 está relacionado con alteraciones en procesos de inmunorregulación. 
+
+3) El componente 3 está relacionado con alteraciones en el metabolismo energético y de señalización de estrés celular. 
+
+4) El componente 4 está relacionado con alteraciones en la inmunidad innata y la homeostasis. 
+
+5) El componente 5 está relacionando con alteraciones en la inflamación y la regeneración celular. 
+
+
+**C-Análisis de los individuos y los componentes**
+
+Por un lado, puesto que para las variables aplicamos una clusterización k-means, también aplicamos esta clusterización para los pacientes:
+
+```{r}
+kmeans2 <- kmeans(df_genes, centers = 3)
+fviz_cluster(kmeans2, df_genes) 
+```
+
+En el gráfico se pueden observar muchos solapamientos entre los clusters. Esto se puede deber a que, aunque los pacientes tengan fenotipos diversos, como los genes pueden estar implicados en diferentes rutas metabolicas y procesos tumorales, los pacientes pueden tener diferentes enfermedades o tipos de cáncer, pero un patrón génico similar o coincidente en  algunos genes. 
+
+También analizamos la distribución de los pacientes en las dos primeras dimensiones, analizando el parámetro cos2:
+
+```{r}
+fviz_pca_ind(pca.result, col.ind = "cos2", gradient.cols = c("blue","yellow", "red"), repel = TRUE)
+
+```
+
+En el gráfico observamos que muchos pacientes se ajustan bien  al nuevo espacio reducido, con algunas excepciones, como los pacientes 10,27, 14 ó 50. 
+
+También clasificamos a los pacientes según si tenían metástasis o no, codificando para ello en el dataset una nueva variable a partir de la variable original "extension". Una vez codificada esta variable, analizamos en un gráfico de puntos ,si tomando diferentes parejas de dimensiones, se podían separar estos dos grupos de pacientes:
+
+```{r}
+df$metastasisnosi <- as.factor(ifelse( df$extension == "metastasico", "metastasis", "no_metastasis"))
+
+df_pca <- as.data.frame(pca.result$x)
+
+df_pca <- df_pca[1:5] 
+
+componentes <- c("PC1", "PC2", "PC3", "PC4", "PC5")
+componentes.plots <- list()
+
+for (i in 1:(length(componentes) - 1))  {
+  grafico <- ggplot(df_pca, aes_string(x =componentes[i], y = componentes[i+1], color = df$metastasisnosi))+geom_point(size = 3)
+  componentes.plots[[i]] <- grafico
+}
+
+grid.arrange(grobs = componentes.plots, nrow = 3)
+
+```
+
+No parece que ninguna gráfica, es decir, que ninguna de las parejas de dimensiones estudiadas, permitan separar a los pacientes según si tienen metástasis o no. Esto podría deberse a que el PCA no es el método de reducción de dimensionalida más adecuado para la separación de los pacientes según si tienen metástasis o no. 
+
+
+Mas cosas de la clusterizacion 
 ### Resultado del clustering
 Tenemos 3 clusters: 2 con 2 variables y otro con 42. Tras buscar 2 genes de cada Cluster en GenBank, nombramos los clusters de la siguiente forma:
 
@@ -77,39 +181,21 @@ Tenemos 3 clusters: 2 con 2 variables y otro con 42. Tras buscar 2 genes de cada
 - Cluster CCL5 y TGFB1: **relacionado con el sistema inmune**, ya que CCL5 es una quimiocina y TGFB1 está íntimamente relacionado con sistemas como los interferones.
 - Cluster general: contiene genes muy variados y con muchas funciones, como ARG1 (que codifica la Arginasa, encargada de catabolizar el aminoácido Arginina),  LOX5 (que codifica la Lipooxigenasa 5) o MAPK1 (encargada de transducir señales de membrana al núcleo para la transcripción de genes de respuesta a estas). **Por eso lo hemos llamado cluster general**.
 
-## **   Mejorar clusterización??
-Tema 4 de algoritmos
 
+# 2.*Tabla descriptiva*
 
-### kmeans con 3 centroides --> esto no lo he tocado
-```{r}
-kmeans3 <- kmeans(df_genes, centers = 3)
-fviz_cluster(kmeans3, df_genes) #clusterizacion pacientets
-
-#individuos en las dos primeras dimensiones
-fviz_pca_ind(pca.result, col.ind = "cos2", gradient.cols = c("blue","yellow", "red"), repel = TRUE)
-
-#codificar una nueva variable
-df$metastasisnosi <- as.factor(ifelse( df$extension == "metastasico", "metastasis", "no metastasis"))
-
-df_pca <- as.data.frame(pca.result$x)
-
-df_pca <- df_pca[1:5] #solo estamos analizando los primeros cinco componentes principales
-
-#alguna pareja de componentes permite separar bien los tipos de pacientes ¿?
-ggplot(df_pca, aes(x =PC1, y = PC4, color = df$metastasisnosi))+geom_point(size = 3)
-```
-
-
-# 4.Tabla descriptiva
 ```{r}
 
 ```
 
 
-# 5.Modelo predictivo Reg.Logística
-output = df$metastasisino
-input = df$PC1:5, df$ que no estén en df_genes 
+# *3.Modelo predictivo Reg.Logística*
+
+El objetivo de este análisis es evaluar cómo influyen una serie de variables independientes sobre una variable dependiente. En este caso la variable dependiente es "metastasisino", una variable categórica con dos niveles, que determina si los pacientes tienen metástasis o no. Por otro lado, las variables independientes son los cinco componentes principales analizados en el PCA, junto con el resto de variables del dataset original (sin contar con los datos de expresión génica, puesto que ya hemos reducido la dimensionalidad y los tenemos representados con los componentes principales).
+
+Tenemos demasiadas variables independientes por lo que, antes de aplicar la regresión logística, utilizamos LASSO, un modelo de regularización que aplica una penalización sobre las variables y permite seleccionar solo aquellas variables con un coeficiente que tras la penalización tienen un valor mayor a 0. Estas serán las variables más importantes a la hora de hacer la clasificación. 
+
+
 ```{r}
 pcs = c("PC1", "PC2", "PC3", "PC4", "PC5")
 df_pca <- df_pca %>% dplyr::select(pcs)
@@ -133,6 +219,56 @@ df_non_numeric <- df_non_numeric %>% gsub('si', "1", df_non_numeric)
 df_non_numeric <- df_non_numeric %>% gsub('no', "0", df_non_numeric)
 df_non_numeric
 ```
+
+Lo que había hecho yo de LASSO pero me sale mal :((( 
+```{r}
+#Primero aplicamos LASSO
+df_regresion <- cbind(df_pca, df_nogenes)
+#Necesitamos que todas las variables sean numericas
+variables <- colnames(df_regresion)
+variables_numericas <- colnames(df_regresion[ ,sapply(df_regresion, is.numeric)]) #variables numericas
+
+#Escalado variables numericas:
+df_numerico <- df_regresion %>% dplyr::select(variables_numericas)
+df_numerico <- scale(df_numerico)
+df_regresion <- df_regresion %>% dplyr::select(-variables_numericas)
+df_regresion <- cbind(df_regresion, df_numerico)
+
+variables_no_numericas <- variables[!variables %in% variables_numericas] #variables no numericas 
+variables_no_numericas_no_sexo <- variables_no_numericas[variables_no_numericas != "sexo"] #variables de tipo si/no
+
+for (i in variables_no_numericas_no_sexo) {
+  
+  df_regresion[[i]] <- ifelse (df_regresion[[i]] == "si", 1, 0
+
+  )
+  
+}
+
+#ahora manualmente se haria el sexo
+
+df_regresion$sexo <- ifelse(df_regresion$sexo == "mujer", 1, 0)
+
+df_regresion <- df_regresion %>% dplyr::select(-X,-id)
+
+y <-  as.factor(df$metastasisnosi)
+x <- as.matrix(df_regresion)
+
+grid <- 10^seq(10,-2, length=100)
+
+lasso.result <- glmnet :: cv.glmnet(x, y, family = "binomial", lambda = grid, alpha = 1)
+lambda_min <- lasso.result$lambda.min
+lasso.coef <- coef(lasso.result, s = "lambda.min")
+lasso.coef <- as.data.frame(as.matrix(lasso.coef))
+lasso.coef$s1 <- round(lasso.coef$s1, 5)
+
+View(lasso.coef)
+
+
+```
+
+
+
 
 ## terciles PCs
 ```{r}
