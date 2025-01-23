@@ -1,0 +1,147 @@
+---
+title: "Untitled"
+author: "Equipo 2, Lote 7 (Europa)"
+date: "2025-01-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = TRUE, warning = FALSE)
+```
+
+# 0.WEnv
+```{r}
+rm(list=ls()) #resetear WEnv
+thisfile_path <- file.choose() #elegir
+wd_path <- sub("/[^/]+$", "", thisfile_path) #ruta de este archivo hasta el último "/" (excluyendo nombre del archivo))
+setwd(wd_path) #setear wd_path como WD
+
+set.seed(1999) #random seed
+library(tidyverse) #ggplot2, dplyr, tidyr, ggpubr, readr...
+library(stats) #ops. básicas de estadística
+library(factoextra) #
+library(pheatmap) #heatmaps
+library(gtsummary) #tabla est.descriptiva
+library(MASS) 
+library(glmnet)
+```
+
+
+# 1.Dataset
+```{r}
+df <- read.csv("1_data/Dataset expresión genes.csv") # dataframe con todas las variables
+               #na.strings = este arg. dice si hay alguna cadena de texto q queramos importar como NA
+df_genes <- df %>% dplyr::select(starts_with("AQ_")) # df solo de los genes
+df_nogenes <- df %>% dplyr::select(-starts_with("AQ_")) # df solo de los genes
+```
+
+
+# 2.PCA
+```{r}
+pca.result <- prcomp(df_genes, center = TRUE, scale = TRUE )
+pca.result$x
+```
+
+
+# 3.Gráficos descriptivos PCA
+## 3.1.¿Cuántos Componentes principales elegimos?
+```{r}
+#Si miramos los eigenvalues:
+eigenvalues <- get_eigenvalue(pca.result)
+eigenvalues # Si cogemos las primeras 5 PCs, explicamos > 70% de la varianza > confirmamos con el gráfico
+fviz_eig(pca.result, addlabels = TRUE) #
+fviz_pca_var(pca.result, col.var = "cos2", gradient.cols = c("blue","yellow", "red"), repel = TRUE) #variables segun calidad cos2
+
+# Contribución de variables a los distintos PCs
+fviz_contrib(pca.result, choice ="var", axes = 1, top = 20) #variables que mas influyen a la dimension 1
+fviz_contrib(pca.result, choice ="var", axes = 2, top = 20) #variables que mas influyen a la dimension 2
+fviz_contrib(pca.result, choice ="var", axes = 3, top = 20) #variables que mas influyen a la dimension 3
+```
+
+
+## 3.2.Clusterizacion
+La hacemos para intentar agrupar variables según PCs
+
+### kmeans con 2 centroides
+```{r}
+kmeans2 <- kmeans(t(df_genes), centers = 2) # hacer clusterización kmeans con 3 clusters
+kmeans2$cluster <- as.factor(kmeans2$cluster) # castear variable cluster
+summary(kmeans2$cluster)
+
+fviz_pca_var(pca.result, col.var = kmeans2$cluster, color.var = cluster_colors, legend.title ="Cluster", repel = TRUE)
+```
+### Resultado del clustering
+Tenemos 3 clusters: 2 con 2 variables y otro con 42. Tras buscar 2 genes de cada Cluster en GenBank, nombramos los clusters de la siguiente forma:
+
+- Cluster ADIPOQ y NOX5: **relacionado con el metabolismo celular** (NOX5 está relacionado con el transporte de protones transmembrana) y hormonal (ADIPOQ vinculando a este proceso en el tejido adiposo)
+- Cluster CCL5 y TGFB1: **relacionado con el sistema inmune**, ya que CCL5 es una quimiocina y TGFB1 está íntimamente relacionado con sistemas como los interferones.
+- Cluster general: contiene genes muy variados y con muchas funciones, como ARG1 (que codifica la Arginasa, encargada de catabolizar el aminoácido Arginina),  LOX5 (que codifica la Lipooxigenasa 5) o MAPK1 (encargada de transducir señales de membrana al núcleo para la transcripción de genes de respuesta a estas). **Por eso lo hemos llamado cluster general**.
+
+## **   Mejorar clusterización??
+Tema 4 de algoritmos
+
+
+### kmeans con 3 centroides --> esto no lo he tocado
+```{r}
+kmeans3 <- kmeans(df_genes, centers = 3)
+fviz_cluster(kmeans3, df_genes) #clusterizacion pacientets
+
+#individuos en las dos primeras dimensiones
+fviz_pca_ind(pca.result, col.ind = "cos2", gradient.cols = c("blue","yellow", "red"), repel = TRUE)
+
+#codificar una nueva variable
+df$metastasisnosi <- as.factor(ifelse( df$extension == "metastasico", "metastasis", "no metastasis"))
+
+df_pca <- as.data.frame(pca.result$x)
+
+df_pca <- df_pca[1:5] #solo estamos analizando los primeros cinco componentes principales
+
+#alguna pareja de componentes permite separar bien los tipos de pacientes ¿?
+ggplot(df_pca, aes(x =PC1, y = PC4, color = df$metastasisnosi))+geom_point(size = 3)
+```
+
+
+# 4.Tabla descriptiva
+```{r}
+
+```
+
+
+# 5.Modelo predictivo Reg.Logística
+output = df$metastasisino
+input = df$PC1:5, df$ que no estén en df_genes 
+```{r}
+pcs = c("PC1", "PC2", "PC3", "PC4", "PC5")
+df_pca <- df_pca %>% dplyr::select(pcs)
+df_rlog =  cbind(df_pca, df_nogenes)
+
+# selecciono vars_num
+df_non_numeric <- df %>% keep(~ !is.numeric(.))
+
+# recodificar vars factor y chr como números --> castear a as.numeric()
+for (col in names(df_non_numeric)) {
+  if ("si" %in% col){
+    gsub("si", "1", col)
+  } else if ("no" %in% col) {
+    gsub("no", "0", col)
+  }
+}
+
+df_non_numeric
+
+df_non_numeric <- df_non_numeric %>% gsub('si', "1", df_non_numeric)
+df_non_numeric <- df_non_numeric %>% gsub('no', "0", df_non_numeric)
+df_non_numeric
+```
+
+## terciles PCs
+```{r}
+# terciles PC1 --> factor var
+df_rlog$`Terciles PC1` <- quantile()
+
+# terciles PC2 (lo mismo que antes)
+# terciles PC3 (lo mismo que antes)
+# terciles PC4 (lo mismo que antes)
+# terciles PC5 (lo mismo que antes)
+```
+
