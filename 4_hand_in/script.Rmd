@@ -1,6 +1,6 @@
 -
-title: "Untitled"
-author: "Pedro Fortes González"
+title: "Taller Grupal Algoritmos"
+author: "Equipo 2 lote 7"
 date: "2025-01-25"
 output: html_document
 -
