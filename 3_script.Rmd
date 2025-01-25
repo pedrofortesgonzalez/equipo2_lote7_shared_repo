@@ -28,6 +28,8 @@ library(MASS)
 library(glmnet)
 library(ggplot2)
 library(gridExtra)
+library(jtools)
+library(car)
 ```
 
 
@@ -193,79 +195,257 @@ Tenemos 3 clusters: 2 con 2 variables y otro con 42. Tras buscar 2 genes de cada
 
 El objetivo de este análisis es evaluar cómo influyen una serie de variables independientes sobre una variable dependiente. En este caso la variable dependiente es "metastasisino", una variable categórica con dos niveles, que determina si los pacientes tienen metástasis o no. Por otro lado, las variables independientes son los cinco componentes principales analizados en el PCA, junto con el resto de variables del dataset original (sin contar con los datos de expresión génica, puesto que ya hemos reducido la dimensionalidad y los tenemos representados con los componentes principales).
 
-Tenemos demasiadas variables independientes por lo que, antes de aplicar la regresión logística, utilizamos LASSO, un modelo de regularización que aplica una penalización sobre las variables y permite seleccionar solo aquellas variables con un coeficiente que tras la penalización tienen un valor mayor a 0. Estas serán las variables más importantes a la hora de hacer la clasificación. 
+Tenemos demasiadas variables independientes por lo que, antes de aplicar la regresión logística, decidimos usar un modelo de regularización, para reducir el número de variables. Al principio, intentamos usar LASSO,  un modelo de regularización que aplica una penalización sobre las variables y permite seleccionar solo aquellas variables con un coeficiente que tras la penalización tienen un valor mayor a 0, que son las variables más importantes a la hora de hacer el análisis. Sin embargo, esto nos salía mal ****indicar bien las razones
+
+Al finar decidimos usar ElasticNet *****explicar bien todo
+
+Antes de poder aplicarr el modelo de regularización, generamos un dataframe con todas las variables (salvo las de expresión génica, que hemos proyectado en un espacio de menor dimensión en forma de componentes) y las convertimos a valores numéricos, ya que es el tipo de dato que necesita las funciones glmnet() y cv.glmnet()
+```{r}
+# las variables factor están en tipo character, tengo que convertirlas a numérico pq glmnet no admite tipo factor
+# casteo a numérico variables char
+df_nogenes <- df %>% dplyr::select(-starts_with("AQ_"), -X, -id, -extension) # df de vars q no son genes
+
+df_char <- df_nogenes[ ,sapply(df_nogenes, is.character)]# guardamos las vars factor en un vector lógico
+df_char$antiemesis <- as.character(ifelse(df$corticoides=="antiemesis", "1", "0"))
+df_char$corticoides <- as.character(ifelse(df$corticoides=="si", "1", "0"))
+
+df_nochar <- df_nogenes[, sapply(df_nogenes, is.numeric)]
+df_nochar <- as.data.frame(scale(df_nochar, center=TRUE, scale=TRUE))
+# convierto variables tipo char a factor y luego a numeros para codificarlas de manera que glmnet las entienda
+for (i in colnames(df_char)) {
+  df_char[[i]] <-as.numeric(as.factor(df_char[[i]]))
+}
+# y concateno df_char, df_nochar y df5 pcs en df_lasso
+df_lasso <- cbind(df_char, df_nochar)
+
+# ahora tb dejo bien formateada la variable respuesta
+df$metastasis = as.factor(as.numeric(ifelse(df$extension == "metastasico", 1, 0)))
+
+# defino variables para df_lasso
+cols = c(colnames(df_lasso))
+x <- df_lasso[, cols]
+y <- df$metastasis
+
+# convertir a matriz para incluir interacciones entre todas las variables
+#formula <- as.formula(paste("y ~", paste(names(x), collapse = " * "))) # Crear una matriz de diseño con interacciones entre todas las variables
+```
+
+
+#### ridge
+```{r}
+# construyo un grid para lambda (para el lambda optimo??)
+grid <- 10^seq(1.5, -1.5, length=100)
+ridge <- glmnet(x, y, alpha=0, lambda=grid, family="binomial")
+dim(coef(ridge))
+print(coef(ridge))
+
+plot(ridge, label=TRUE) # lambda plot
+plot(ridge, xvar="lambda", label=TRUE) #log lambda plot
+```
+
+estos plots nos dan una idea gráfica del valor óptimo de lambda para ridge
+```{r}
+x_matrix <- as.matrix(x)
+y_matrix <- as.matrix(y)
+# hago un m
+#modelo de cross validation
+ridge_cv <- cv.glmnet(x_matrix, y_matrix, alpha=0, lambda=grid, family="binomial")
+lambda_min <- ridge_cv$lambda.min # este es el lambda que menor error nos da para el modelo, me lo guardo en un objeto
+# y lo uso para generar modelo de ridge
+ridge_cv <- glmnet(x_matrix, y_matrix, alpha=0, lambda = lambda_min, family="binomial")
+coef(ridge_cv)
+```
+
+Todas las variables tienen valores muy bajos... Creo que sería ideal eliminar algunas
+
+#### lasso
+```{r}
+grid <- 10^seq(-4,1, lenght=100)
+lasso <- glmnet(x, y, alpha=1, lambda=grid, family="binomial")
+dim(coef(lasso))
+print(coef(lasso))
+
+plot(lasso, label=TRUE) # lambda plot
+plot(lasso, xvar="lambda", label=TRUE) #log lambda plot
+```
+
+estos plots nos dan una idea gráfica del valor óptimo de lambda para ridge
+```{r}
+# hago un modelo de cross validation
+grid <- 10^seq(-3,0, lenght=100)
+lasso_cv <- cv.glmnet(x_matrix, y_matrix, alpha=1, lambda=grid, family="binomial")
+plot(lasso_cv)
+```
+
+El lambda min me dejará solo una variable (intercepto), pero podemos usar otra regla: en vez de el lambda mínimo, usamos el lambda "within one standard error from the minimum" --> lambda que minimiza el CV error + 1 SE (si no, el valor de lambda mínimo se carga todas las variables)
+
+```{r}
+lambda_min <- lasso_cv$lambda.min
+lambda_1se <- lasso_cv$lambda.1se # este es el lambda que menor error nos da para el modelo, me lo guardo en un objeto
+# y lo uso para generar modelo de ridge
+lasso_cv <- glmnet(x, y, alpha=1, lambda = lambda_1se, family="binomial")
+coef(lasso_cv)
+```
+
+#### elastic net
+
+```{r}
+seq_alpha <- seq(0,1,by=0.01)
+grid <- 10^seq(3, -3, length=100) # lo hago de + a - pq el lambda óptimo  es negativo (ver plots iniciales de lasso)
+
+best_alpha <- NULL
+best_lambda <- NULL
+min_error <- Inf
+
+# encontrar el mejor alpha
+for (alpha in seq_alpha) {
+  enet_cv <- cv.glmnet(x_matrix, y_matrix, alpha=alpha, lambda=grid, family="binomial")
+  # Obtener valor de lambda óptimo elegido automáticamente
+  lambda_min<-enet_cv$lambda.min
+  #Obtener el error de validación cruzada mínimo
+  cv_error <- min(enet_cv$cvm)
+  #Actualizar el mejor alpha y lambda si se encuentra un error de cv menor
+  if (cv_error < min_error) {
+    min_error <- cv_error
+    best_alpha <- alpha
+    best_lambda <- lambda_min
+  }}
+
+# Imprimir el mejor alpha y lambda encontrados tras el bucle
+cat("Mejor alpha:", best_alpha, "\n")
+cat("Mejor lambda:", best_lambda, "\n")
+```
+
+
+```{r ejecutar elasticnet}
+grid <- 10^seq(0, -2, length=100)
+# hago un modelo de cross validation
+enet_cv <- cv.glmnet(x_matrix, y_matrix, alpha=0.67, lambda=grid, family="binomial")
+plot(enet_cv)
+lambda_1se <- enet_cv$lambda.1se
+lambda_1se
+```
+
+```{r}
+enet_cv <- glmnet(x_matrix, y_matrix, alpha=0.36, lambda=10^-1, family="binomial")
+coefs_enet <- as.data.frame(as.matrix(coef(enet_cv))) %>% filter(s0!=0)
+coefs_enet <- coefs_enet %>% slice_tail(n = 18) # quitamos el intercept
+reg_vars <- rownames(coefs_enet)
+reg_vars <- reg_vars[reg_vars != "antiemesis"]
+```
+
+Variables de regularización están en un vector `reg_vars`.
+
+Una vez seleccionadas las variables del dataset original para el modelo de regresión logística, añadimos también los terciles de los cinco primeros componentes principales, en forma de variables categóricas que indian a qué tercil de cada componente pertenece cada paciente. Para ello, primero se calcularon los terciles de los componentes con la función quantile() y luego se recodificaron las variables de los componentes principales mediante la función cut()
+
+```{r}
+#Terciles 
+tercilPC1 <- quantile(df_pca$PC1, probs = c(1/3,2/3,1))
+tercilPC2 <- quantile(df_pca$PC2,probs = c(1/3,2/3,1))
+tercilPC3 <- quantile(df_pca$PC3, probs = c(1/3,2/3,1))
+tercilPC4 <- quantile(df_pca$PC4, probs = c(1/3,2/3,1))
+tercilPC5 <- quantile(df_pca$PC5, probs = c(1/3,2/3,1))
+
+df_regresion <- df%>% dplyr::select(reg_vars)
+
+#Variable tercil > forma categorica
+df_regresion$TPC1   <- as.factor(cut(df_pca$PC1, c(-Inf, tercilPC1[1], tercilPC1[2], Inf), labels = c("T1", "T2", "T3")))
+
+df_regresion$TPC2   <- as.factor(cut(df_pca$PC2, c(-Inf, tercilPC2[1], tercilPC2[2], Inf), labels = c("T1", "T2", "T3")))
+
+df_regresion$TPC3   <- as.factor(cut(df_pca$PC3, c(-Inf, tercilPC3[1], tercilPC3[2], Inf), labels = c("T1", "T2", "T3")))
+
+df_regresion$TPC4   <- as.factor(cut(df_pca$PC4, c(-Inf, tercilPC4[1], tercilPC4[2], Inf), labels = c("T1", "T2", "T3")))
+
+df_regresion$TPC5   <- as.factor(cut(df_pca$PC5, c(-Inf, tercilPC5[1], tercilPC5[2], Inf), labels = c("T1", "T2", "T3")))
+
+#Tambien hay que añadir la variable categorica
+df_regresion$metastasis <- as.factor(df$metastasis)
+
+#El resto de variables categoricas hay que pasarlas a factor
+df_regresion$sexo <- as.factor(df_regresion$sexo)
+df_regresion$ETE <- as.factor(df_regresion$ETE)
+df_regresion$neumopatia <- as.factor(df_regresion$neumopatia)
+df_regresion$hepatopatia <- as.factor(df_regresion$hepatopatia)
+df_regresion$ITU <- as.factor(df_regresion$ITU)
+df_regresion$renal  <- as.factor(df_regresion$renal)
+df_regresion$neuropatia <- as.factor(df_regresion$neuropatia)
+df_regresion$corticoides <- as.factor(df_regresion$corticoides)
+df_regresion$secrecion <- as.factor(df_regresion$secrecion)
+df_regresion$dolor_garg <- as.factor(df_regresion$dolor_garg)
+df_regresion$anosmia <- as.factor(df_regresion$anosmia)
+df_regresion$dolor_abdo <- as.factor(df_regresion$dolor_abdo)
+
+```
+
+Una vez tuvimos en un dataframe todas las variables del dataset original que hemos seleccionado para la regresion logística, junto con los terciles de los cinco primeros componentes codificados en forma de factor, hicimos la regresión logística:
+
+```{r}
+reg_vars <- c(reg_vars, "TPC1", "TPC2", "TPC3","TPC4","TPC5")
+formula <- as.formula(paste("metastasis ~", paste(reg_vars, collapse = "+")))
+
+modelo_regresion <- glm(formula, data = df_regresion, family = "binomial")
+```
+
+Para poder interpretar los resultados del modelo de regresión logística, necesitamos sacar los Odds-Ratios (OR), ya que los coeficientes no son directamente interpretables. Para ello, hay que obtener la forma exponencial de dichos coeficientes. En estos OR, lo que se obtiene es el efecto, positivo o negativo, que las variables independientes tienen sobre la clase de interés de la variable dependiente (en este caso, 1, es decir, tener metástasis) con respecto a la clase de referencia (en este caso 0, es decir, no tener metástasis). También hay que tener en cuenta si este efecto es significativo o no, lo cual se puede saber a través del pvalor o analizando los intervalos de confianza. 
+
+```{r}
+exp(coef(modelo_regresion)) #OR
+exp(confint(modelo_regresion))
+summ(modelo_regresion) #pvalor
+
+#Salen cosas muy raras, vamos a ver la colinealidad 
+vif(modelo_regresion)
+
+#habria que quitar aquellas variables con un VIF mayor de 5, como sexo, neumopatia, neuropatia, coticoides, secrecion, dolo_abdio, chol, hierro, igN, cpk (realmente los terciles tambien tienen colinealidad pero es raro porque se suponen que vienen de un PCA)
+
+variables_a_eliminar <- c("sexo", "neumopatia", "neuropatia", "corticoides", "secrecion", "dolor_abdo", "chol", "hierro", "igN", "cpk")
+
+# Eliminar las variables específicas de la fórmula
+reg_vars_modificadas <- setdiff(reg_vars, variables_a_eliminar)
+
+# Crear la nueva fórmula con las variables modificadas
+
+formula_modificada <- as.formula(paste("metastasis ~", paste(reg_vars_modificadas, collapse = "+")))
+
+
+modelo_regresion2 <- glm(formula_modificada, data = df_regresion, family = "binomial")
+
+summ(modelo_regresion2) #ahora salen cosas mas normales
+exp(confint(modelo_regresion2))
+
+vif(modelo_regresion2) #ahora ya no hay tanto problema de colinealidad, aunque algunas variables siguen sin salir bien del todo. 
+
+```
+
+
+Ahora hay que calcular terciles de las PCs (`df_5pcs`)
+```{r}
+for (i in )
+```
+
+
+# 4.Tabla descriptiva
+```{r}
+for (i)
+```
+
+
+variables dummy
+$$
+baseline = T1 \rightarrow\text{para los 5 PCs} \\
+
+metastasis = PC1T2\times\beta_{PC1T2} + PC1T3\times\beta_{PC1T3} + \\
+PC2T2\times\beta_{PC1T2} + PC2T3\times\beta_{PC1T3} + \\
+PC3T2\times\beta_{PC1T2} + PC3T3\times\beta_{PC1T3} + \\
+PC4T2\times\beta_{PC1T2} + PC4T3\times\beta_{PC1T3} + \\
+PC5T2\times\beta_{PC1T2} + PC5T3\times\beta_{PC1T3}
+$$
+```
 
 
 ```{r}
-pcs = c("PC1", "PC2", "PC3", "PC4", "PC5")
-df_pca <- df_pca %>% dplyr::select(pcs)
-df_rlog =  cbind(df_pca, df_nogenes)
 
-# selecciono vars_num
-df_non_numeric <- df %>% keep(~ !is.numeric(.))
-
-# recodificar vars factor y chr como números --> castear a as.numeric()
-for (col in names(df_non_numeric)) {
-  if ("si" %in% col){
-    gsub("si", "1", col)
-  } else if ("no" %in% col) {
-    gsub("no", "0", col)
-  }
-}
-
-df_non_numeric
-
-df_non_numeric <- df_non_numeric %>% gsub('si', "1", df_non_numeric)
-df_non_numeric <- df_non_numeric %>% gsub('no', "0", df_non_numeric)
-df_non_numeric
-```
-
-Lo que había hecho yo de LASSO pero me sale mal :((( 
-```{r}
-#Primero aplicamos LASSO
-df_regresion <- cbind(df_pca, df_nogenes)
-#Necesitamos que todas las variables sean numericas
-variables <- colnames(df_regresion)
-variables_numericas <- colnames(df_regresion[ ,sapply(df_regresion, is.numeric)]) #variables numericas
-
-#Escalado variables numericas:
-df_numerico <- df_regresion %>% dplyr::select(variables_numericas)
-df_numerico <- scale(df_numerico)
-df_regresion <- df_regresion %>% dplyr::select(-variables_numericas)
-df_regresion <- cbind(df_regresion, df_numerico)
-
-variables_no_numericas <- variables[!variables %in% variables_numericas] #variables no numericas 
-variables_no_numericas_no_sexo <- variables_no_numericas[variables_no_numericas != "sexo"] #variables de tipo si/no
-
-for (i in variables_no_numericas_no_sexo) {
-  
-  df_regresion[[i]] <- ifelse (df_regresion[[i]] == "si", 1, 0
-
-  )
-  
-}
-
-#ahora manualmente se haria el sexo
-
-df_regresion$sexo <- ifelse(df_regresion$sexo == "mujer", 1, 0)
-
-df_regresion <- df_regresion %>% dplyr::select(-X,-id)
-
-y <-  as.factor(df$metastasisnosi)
-x <- as.matrix(df_regresion)
-
-grid <- 10^seq(10,-2, length=100)
-
-lasso.result <- glmnet :: cv.glmnet(x, y, family = "binomial", lambda = grid, alpha = 1)
-lambda_min <- lasso.result$lambda.min
-lasso.coef <- coef(lasso.result, s = "lambda.min")
-lasso.coef <- as.data.frame(as.matrix(lasso.coef))
-lasso.coef$s1 <- round(lasso.coef$s1, 5)
-
-View(lasso.coef)
-
-
-```
 
 
 
