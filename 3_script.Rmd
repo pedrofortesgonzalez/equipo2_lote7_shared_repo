@@ -1,5 +1,5 @@
 ---
-title: "Untitled"
+title: "Estadística y R - actividad 3"
 author: "Equipo 2, Lote 7 (Europa)"
 date: "2025-01-22"
 output: html_document
@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE, message = TRUE, warning = FALSE)
 # 0.WEnv
 El primer paso siempre resetear el entorno de trabajo, cargar el fichero con el que se va a trabajar (en este caso "Dataset expresión genes.csv") y cargar todas las librerías que van a ser necesarias para el análisis. 
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 rm(list=ls()) #resetear WEnv
 thisfile_path <- file.choose() #elegir
 wd_path <- sub("/[^/]+$", "", thisfile_path) #ruta de este archivo hasta el último "/" (excluyendo nombre del archivo))
@@ -24,6 +24,7 @@ library(stats) #ops. básicas de estadística
 library(factoextra) #
 library(pheatmap) #heatmaps
 library(gtsummary) #tabla est.descriptiva
+library(gt) #convertir dfs en tablas con estilo gtsummary
 library(MASS) 
 library(glmnet)
 library(ggplot2)
@@ -33,6 +34,8 @@ library(car)
 ```
 
 
+
+***
 # 1.Dataset
 ```{r}
 df <- read.csv("1_data/Dataset expresión genes.csv") # dataframe con todas las variables
@@ -42,10 +45,10 @@ df_nogenes <- df %>% dplyr::select(-starts_with("AQ_")) # df solo de los genes
 ```
 
 
-# 2.*PCA*
 
-##**Introducción y metodología**
-
+***
+# 2.PCA
+##Introducción y metodología
 El Análisis de Componentes Principales (PCA) es un método de reducción de la dimensionalidad muy utilizado, sobretodo para conjuntos de datos con relaciones lineales. El objetivo de este modelo es reducir la complejidad de un conjunto de variables observadas, identificando una serie de componentes principales que explican la mayor parte de la variabilidad en los datos originales. En este modelo se asume que cada componente se forma por la combinación lineal de todas las variables del modelo y cada una tiene una determinada carga que indica si contribuye más o menos al componente y su dirección de contribución.
 
 En este ejemplo, el objetivo era aplicar un PCA sobre las variables de expresión génica del dataset, para luego determinar el número de componentes óptimo para explicar la mayor parte de los datos (un 70% de variaza) y darle un sentido biológico a esos componentes principales. 
@@ -56,37 +59,37 @@ Para aplicar el PCA en R, se puede usar la función prcomp() de la librería sta
 pca.result <- prcomp(df_genes, center = TRUE, scale = TRUE )
 ```
 
-##**Análisis y gráficos**
-**A-Elección del número de componentes principales**
-
+##Análisis y gráficos
+### A-Elegir nº de PCs
 En el PCA se generan muchos componentes principales y es fundamental elegir el número óptimo para el análisis. Existen diferentes criterios para elegir este número de componentes principales. Uno de ellos sería analizar la varianza explicada por cada componente principal y buscar el número de componentes donde la varianza acumulada sea adecuada (en este caso hemos elegido un 70%):
 
 ```{r}
-eigenvalues <- get_eigenvalue(pca.result)
-eigenvalues 
+eigenvalues <- get_eigenvalue(pca.result) %>% round(., 2) # sacar eigenvalues y representar las cols en formato numérico estándar con 2 decimales
+tabla_pca_r2 <- eigenvalues %>% 
+  tibble::rownames_to_column(var="Componente") %>% # guardar nombres de PCs como columna
+  dplyr::select(Componente, variance.percent) %>% # generar tabla PCA componentes y R2
+  dplyr::rename(R2 = variance.percent)
+#guardar esta tabla
+gtsave(gt(tabla_pca_r2), filename = "4_tables/Tabla 1 - PCA Componentes R2.html") # guardar html
+head(eigenvalues) # ver caract. de primeras dimensiones
 ```
 
-Con este método, habría que coger al menos 5 componentes principales. Otra opción es generar un scree plot y buscar el punto de allanamiento de la gráfica:
-
-
+Para obtener este 70%, debemos escoger al menos 5 PCs. Otra opción es generar un scree plot y buscar el punto de allanamiento de la gráfica (ver siguiente gráfico). Este scree plot nos muestra el porcentaje de varianza asociado a cada variable, el cual obtenemos en forma de tabla de la función anterior `get_eigenvalue` y guardamos con `gtsave()` como **Tabla 1 - PCA Componentes R2**.
 ```{r}
 fviz_eig(pca.result, addlabels = TRUE) 
 ```
 
 En el gráfico, se observa que  el allanamiento de la gráfica ocurre en el segundo componente, ya que el componente principal explica gran parte de la varianza (52,5%) y el resto de componentes aportan mucha menos varinza. Sin embargo, como consideramos importante llegar a un 70% de varianza, decidimos trabajar con los cinco primeros componentes principales. 
 
-**B-Análisis de las variables y los componentes**
-
-Podemos representar, en dos dimensiones, las variables del dataset, en forma de flechas, cuya longitud indica la fuerza con la que las variables constribuyen a cada dimensión y cuya dirección indica si la asociación es positiva o negativa. 
-Además, podemos establecer un código de colores, de modo que se represente simultáneamente el parámetro cos2. Este parámetro indica qué tan bien están representadas las variables por los componentes principales, en otras palabras, establece cómo de bien "caben" las variables en el espacio de menor dimensión. 
-
+### B-Analiza variables y PCs
+Podemos representar en dos dimensiones las variables del dataset, en forma de vectores cuya longitud indica la fuerza con la que las variables constribuyen a cada dimensión y cuya dirección indica si la asociación es positiva o negativa. 
+Además, podemos establecer un código de colores, de modo que se represente simultáneamente el parámetro `cos2`. Este parámetro indica qué tan bien están representadas las variables por los componentes principales, en otras palabras, establece cómo de bien "caben" las variables en el espacio de menor dimensión. 
 ```{r}
 fviz_pca_var(pca.result, col.var = "cos2", gradient.cols = c("blue","yellow", "red"), repel = TRUE, axes = c(1,2),
              title = "Cos2 de variables en PC1 y PC2")
 ```
 
-En el gráfico, se puede apreciar como  casi todas las variables se ajustan bien al epacio de menor dimension,menos algunos genes como ADIPOQ o NOX5.
-Además, en ese gráfico también se observa la tendencia que tienen muchas variables a asociarse negativamente y con bastante fuerza a la dimensión 2. 
+En el gráfico, se puede apreciar cómo casi todas las variables se ajustan bien al epacio de menor dimensión, menos algunos genes como ADIPOQ o NOX5 (por sus bajos valores de ADIPO1 y NOX5). Además, en ese gráfico también se observa la tendencia que tienen muchas variables a asociarse negativamente y con bastante fuerza a la dimensión 1. 
 
 Este código de colores se puede establecer también según otros criterios. Por ejemplo, se puede aplicar un algoritmo de clusterización, para intentar agrupar las variables:
 
@@ -96,17 +99,17 @@ kmeans <- kmeans(t(df_genes), centers = 2)
 clusters <- list()
 
 for (i in 1:4) {
-  
-  cluster.plot <- fviz_pca_var(pca.result, col.var = kmeans$cluster, gradient.cols = c("blue","green", "red"), axes = c(i,i+1), 
-                               legend.title ="Clusterizacion", repel = TRUE) 
+  cluster.plot <- fviz_pca_var(
+    pca.result, col.var = kmeans$cluster, gradient.cols = c("blue","green", "red"), 
+    axes = c(i,i+1), legend.title ="Clusterizacion", repel = TRUE) 
   clusters[[i]] <- cluster.plot
 }
 
-todos.clusters <- grid.arrange(grobs = clusters, nrow = 3)
+todos.clusters <- grid.arrange(grobs = clusters, nrow = 2)
 todos.clusters
 ```
 
-En estas gráficas, se ha representado la fuerza y la dirección de las variables con distintas combinaciones de pares de dimensiones. Para la dimensión 2 se observa la tendencia que tienen las variables de asociarse de forma negativa e intensa, unna tendencia que no se aprecia para el resto de dimensiones, donde hay mucha heterogeneidad. Por otro lado, la clusterización no ha sido eficiente, ya que prácticamente todas las variales se agrupan en el mismo cluster, mientras que queda una pareja de variables en otro cluster, que coincide con las variables con un menor cos2, es decir, este grupo consiste en las variables que peor se ajustan al modelo. Sería interesante probar otros algoritmos de clusterización (Asignatura de Algoritmos, tema 4) para analizar si alguno de ellos permite una agrupación más óptima de las variables. No lo hemos estudiado porque hemos considerado que no era el objetivo de la actividad. 
+En estas gráficas, se ha representado la fuerza y la dirección de las variables con distintas combinaciones de pares de dimensiones. Para la dimensión 1 se observa la tendencia que tienen las variables de asociarse de forma negativa e intensa, tendencia que no se aprecia para el resto de dimensiones, donde hay mucha heterogeneidad. Por otro lado, la clusterización no ha sido eficiente ya que prácticamente todas las variales se agrupan en el mismo cluster, mientras que queda una pareja de variables en otro cluster que coincide con las variables con un menor cos2, es decir, este grupo consiste en las variables que peor se ajustan al modelo. Sería interesante probar otros algoritmos de clusterización (Asignatura de Algoritmos, tema 4) para analizar si alguno de ellos permite una agrupación más óptima de las variables. No lo hemos estudiado porque hemos considerado que no era el objetivo de la actividad. 
 
 Para dar un sentido y un nombre a los 5 componentes principales elegidos, hemos analizado las variables que más contribuyen a cada uno de estos componentes:
 
@@ -130,9 +133,23 @@ Tras una búsqueda de estos genes en bases de datos como GenBank, se ha determin
 
 5) El componente 5 está relacionando con alteraciones en la inflamación y la regeneración celular. 
 
+#### Loadings
+Para un análisis más detallado de todo esto, la propia función prcomp() devuelve un df que refleja cuánto contribuye cada gen a cada PC, así que los guardo en una tabla (**Tabla 2**).
+```{r}
+pca_loadings <- as.data.frame(pca.result$rotation) #los guardamos en un df
 
-**C-Análisis de los individuos y los componentes**
+pca_loadings <- pca_loadings %>% 
+  tibble::rownames_to_column(var="Gene") # gene names a columna (para no perderlos)
+  
+# los guardo en un objeto aparte para exportar con gt (ya que el formateo en scientific notation los conveirte en tipo chr.)
+pca_loadings_exp <- pca_loadings %>% mutate(across(.cols = -Gene, # para toda cols excp Gene
+                ~ ifelse(. < 0.1, sprintf("%.1e", .), sprintf("%.2f", .)))) # redondeamos a 1 decimal y escribimos en notación científica si son < 0.1, también con un decimal
 
+# guardamos el df como objeto gt y exportamos para visualizar en Anexo
+gtsave(gt(pca_loadings_exp), filename = "4_tables/Tabla 2 - PCA Cargas.html") # guardar html
+```
+
+### C-Analizar individuos y PCs
 Por un lado, puesto que para las variables aplicamos una clusterización k-means, también aplicamos esta clusterización para los pacientes:
 
 ```{r}
@@ -140,66 +157,147 @@ kmeans2 <- kmeans(df_genes, centers = 3)
 fviz_cluster(kmeans2, df_genes) 
 ```
 
-En el gráfico se pueden observar muchos solapamientos entre los clusters. Esto se puede deber a que, aunque los pacientes tengan fenotipos diversos, como los genes pueden estar implicados en diferentes rutas metabolicas y procesos tumorales, los pacientes pueden tener diferentes enfermedades o tipos de cáncer, pero un patrón génico similar o coincidente en  algunos genes. 
+En el gráfico se pueden observar muchos solapamientos entre los clusters. Esto se puede deber a que, aunque los pacientes tengan fenotipos diversos, como cada gen puede estar implicado en diferentes rutas metabólicas y procesos tumorales, los pacientes pueden tener diferentes enfermedades o tipos de cáncer a la vez que un patrón génico similar o coincidente en algunos genes. 
 
 También analizamos la distribución de los pacientes en las dos primeras dimensiones, analizando el parámetro cos2:
 
 ```{r}
 fviz_pca_ind(pca.result, col.ind = "cos2", gradient.cols = c("blue","yellow", "red"), repel = TRUE)
-
 ```
 
-En el gráfico observamos que muchos pacientes se ajustan bien  al nuevo espacio reducido, con algunas excepciones, como los pacientes 10,27, 14 ó 50. 
+En el gráfico observamos que muchos pacientes se ajustan bien  al nuevo espacio reducido, con algunas excepciones, como los pacientes 10, 27, 14 ó 50 (los que vemos en azul, que tienen bajos valores de las primeras 2 PCs). 
 
-También clasificamos a los pacientes según si tenían metástasis o no, codificando para ello en el dataset una nueva variable a partir de la variable original "extension". Una vez codificada esta variable, analizamos en un gráfico de puntos ,si tomando diferentes parejas de dimensiones, se podían separar estos dos grupos de pacientes:
-
+También clasificamos a los pacientes según si tenían metástasis o no, codificando para ello en el dataset una nueva variable a partir de la variable original "extension". Una vez codificada esta variable, analizamos en un scatter plot si tomando diferentes parejas de dimensiones se podían separar estos dos grupos de pacientes:
 ```{r}
 df$metastasisnosi <- as.factor(ifelse( df$extension == "metastasico", "metastasis", "no_metastasis"))
 
-df_pca <- as.data.frame(pca.result$x)
-
-df_pca <- df_pca[1:5] 
+df_pca_scores <- as.data.frame(pca.result$x)
+df_pca_scores <- df_pca_scores[1:5] 
 
 componentes <- c("PC1", "PC2", "PC3", "PC4", "PC5")
 componentes.plots <- list()
 
 for (i in 1:(length(componentes) - 1))  {
-  grafico <- ggplot(df_pca, aes_string(x =componentes[i], y = componentes[i+1], color = df$metastasisnosi))+geom_point(size = 3)
+  grafico <- ggplot(df_pca_scores, aes_string(x =componentes[i], y = componentes[i+1], color = df$metastasisnosi))+geom_point(size = 3)
   componentes.plots[[i]] <- grafico
 }
 
-grid.arrange(grobs = componentes.plots, nrow = 3)
-
+grid.arrange(grobs = componentes.plots, nrow = 2)
 ```
 
-No parece que ninguna gráfica, es decir, que ninguna de las parejas de dimensiones estudiadas, permitan separar a los pacientes según si tienen metástasis o no. Esto podría deberse a que el PCA no es el método de reducción de dimensionalida más adecuado para la separación de los pacientes según si tienen metástasis o no. 
+No parece que ninguna gráfica, es decir, que ninguna de las parejas de dimensiones estudiadas, permitan separar a los pacientes según si tienen metástasis o no. Esto podría deberse a tres factores no necesariamente excluyentes entre sí:
 
+- 1: PCA no es el método de reducción de dimensionalida más adecuado para analizar el papel de la expresión génica en la metástasis o no para estos individuos
 
-Mas cosas de la clusterizacion 
-### Resultado del clustering
-Tenemos 3 clusters: 2 con 2 variables y otro con 42. Tras buscar 2 genes de cada Cluster en GenBank, nombramos los clusters de la siguiente forma:
+- 2: el tamaño muestral no es suficientemente grande y/o el dataset de genes es insuficiente o incorrecto para explicar el fenotipo en cuestión.
 
-- Cluster ADIPOQ y NOX5: **relacionado con el metabolismo celular** (NOX5 está relacionado con el transporte de protones transmembrana) y hormonal (ADIPOQ vinculando a este proceso en el tejido adiposo)
-- Cluster CCL5 y TGFB1: **relacionado con el sistema inmune**, ya que CCL5 es una quimiocina y TGFB1 está íntimamente relacionado con sistemas como los interferones.
-- Cluster general: contiene genes muy variados y con muchas funciones, como ARG1 (que codifica la Arginasa, encargada de catabolizar el aminoácido Arginina),  LOX5 (que codifica la Lipooxigenasa 5) o MAPK1 (encargada de transducir señales de membrana al núcleo para la transcripción de genes de respuesta a estas). **Por eso lo hemos llamado cluster general**.
+- 3: necesitamos de más variables para explicar el fenotipo de interés.
 
+## Tabla descriptiva de las PCs
+Objetivo: hacer una tabla donde se recojan medidas descriptivas de cada tercil de las 5 primeras PCs. Para ello, antes debemos chequear la normalidad para ver qué test haremos entre las medias/medianas de los 3-iles.
 
-# 2.*Tabla descriptiva*
+### Chequear normalidad
+Como en la tabla incluiremos test de contraste de hipótesis para comparar los 3-iles, debemos elegir el test antes de construirla. Testearemos la igualdad de expresión para cada gen a lo largo de los terciles de cada componente del PCA, es decir, que testearemos la igualdad de medias (e.paramétrica) o medianas (e. no paramétrica) de 3 grupos (los terciles del PC en cuestión). Tenemos, por tanto, que calcular la normalidad para las variables de expresión génica, ya que usaremos:
 
+- v. con d. normal: one way ANOVA
+- v. con d. no normal: test de Kruskal-Wallis
+
+Elegimos estos test porque las muestras no son emparejadas. Por tanto, calculamos normalidad en df_genes y almacenamos vars. con d. normal en un vector y aquellas con d. no normal en otro:
 ```{r}
-
+# creo un tibble para guardar datos del test de normalidad y lo convierto a data frame
+norm_test_1 <- tibble(`Variable` = rep(NA, 46), 
+                      `Test utilizado` = rep("Test de Shapiro-Wilk", 46),
+                      `Valor p` = rep(NA, 46),
+                      `Interp` = rep(NA, 46)) %>% as.data.frame()
+# bucle para rellenar tabla de resultado
+for (i in 1:length(df_genes)) {
+  norm_test_1[i,1] <- colnames(df_genes)[[i]] # rellenar col 1 de tabla 1
+  norm_test_1[i,2] <- "Shapiro-Wilk" # rellenar col 2 de tabla 1
+  shapiro_result <- shapiro.test(df_genes[[i]]) # calculo el test y lo guardo en shapiro_result
+  pvalue = shapiro_result$p.value # guardo el pvalue en otra variable
+  # if-else para rellenar col 3
+  if (pvalue < 0.001) {pvalue_f <- signif(pvalue, digits = 3)} # redondear pvalue a 3 decimales en SNotation
+  else  {pvalue_f <- round(pvalue, 3)} # expresar pvalue redondeado a 3 caracteres
+  norm_test_1[i, 3] <- as.numeric(pvalue_f)
+  # rellenar col 4 en función de pvalor
+  if (pvalue < 0.05) {norm_test_1[i, 4] <- "D. NO normal"}
+  else {norm_test_1[i, 4] <- "D. NORMAL"}
+}
+# castear norm_test_1$Interpretacion como tipo factor para ver summary()
+summary(as.factor(norm_test_1$Interp))
 ```
 
+Todos los genes tienen una distribución no normal, por lo que testearemos las diferencias entre sus terciles con el *test de Kruskal-Wallis*.
 
-# *3.Modelo predictivo Reg.Logística*
 
-El objetivo de este análisis es evaluar cómo influyen una serie de variables independientes sobre una variable dependiente. En este caso la variable dependiente es "metastasisino", una variable categórica con dos niveles, que determina si los pacientes tienen metástasis o no. Por otro lado, las variables independientes son los cinco componentes principales analizados en el PCA, junto con el resto de variables del dataset original (sin contar con los datos de expresión génica, puesto que ya hemos reducido la dimensionalidad y los tenemos representados con los componentes principales).
+### Calcular 3-iles
+```{r}
+# Con un bucle for
+for (i in 1:length(df_pca_scores)) {
+  # guardo terciles 1 y 2 en variables
+  t1 = quantile(df_pca_scores[[i]], probs=c(1/3))
+  t2 = quantile(df_pca_scores[[i]], probs=c(2/3))
+  # defino nombre de nueva columna
+  column_name = paste0("T", colnames(df_pca_scores)[[i]])
+  # genero
+  df_pca_scores[[column_name]] = as.factor(cut(df_pca_scores[[i]], c(-Inf, t1, t2, Inf), labels = c("t1", "t2", "t3")))
+}
+summary(df_pca_scores)# check result
+```
 
-Tenemos demasiadas variables independientes por lo que, antes de aplicar la regresión logística, decidimos usar un modelo de regularización, para reducir el número de variables. Al principio, intentamos usar LASSO,  un modelo de regularización que aplica una penalización sobre las variables y permite seleccionar solo aquellas variables con un coeficiente que tras la penalización tienen un valor mayor a 0, que son las variables más importantes a la hora de hacer el análisis. Sin embargo, esto nos salía mal ****indicar bien las razones
+### Tabla descriptiva PCA
+```{r}
+# Construir tabla descriptiva
+#############################
+df_d_pca <- cbind(df_genes, df_pca_scores) # concatenamos df de expresión génica y df con las pcs
 
-Al finar decidimos usar ElasticNet *****explicar bien todo
+reset_gtsummary_theme() # resetear opciones de tema para gtsummary
+theme_gtsummary_compact() # usar tema `Compact` en gtsummary
 
-Antes de poder aplicarr el modelo de regularización, generamos un dataframe con todas las variables (salvo las de expresión génica, que hemos proyectado en un espacio de menor dimensión en forma de componentes) y las convertimos a valores numéricos, ya que es el tipo de dato que necesita las funciones glmnet() y cv.glmnet()
+# Defino vectors con nombres de vars
+gene_varnames <- c(names(df_genes))
+pca_varnames <- names(df_pca_scores)
+d_pca_varnames <- names(df_d_pca)
+strata_vars <- c("PC1", "PC2", "PC3", "PC4", "PC5")
+by_vars <- c("TPC1", "TPC2", "TPC3", "TPC4", "TPC5")
+
+result_list <- map2(strata_vars, by_vars, ~ {
+  df_d_pca %>% 
+    # Seleccionar solo las columnas relevantes: x es la PC, y es su col de terciles
+    dplyr::select(all_of(gene_varnames), .y) %>%  
+    # Construimos tabla con tbl_summary
+    tbl_summary(by = .y, # estratificar en función de 3-iles
+                statistic = all_continuous() ~ "{median} ({p25}, {p75})", #mediana + IQR
+                # digitos en scientific notation
+                digits = all_continuous() ~ function(x) format(x, digits = 2, scientific = TRUE), 
+                missing = "no") %>%  # excluir NAs
+    # Prueba de Kruskal-Wallis solo a vars de expresión génica
+    add_p(test = all_continuous() ~ "kruskal.test", include = all_of(gene_varnames)) %>%
+    # añadir corrección de pvalue para disminuir falsos positivos
+    add_q(method = "bonferroni", pvalue_fun = NULL, quiet = NULL) %>% 
+    bold_p(t = 0.05, q = TRUE) #destacar pvalues significativos en negrita
+})
+# Convertir cada tabla en result_list a gt
+gt_tables <- map(result_list, as_gt)
+# Imprimir cada tabla individualmente (guardadas en documento adjunto)
+#walk(gt_tables, print)
+# Guardar cada tabla individualmente como .html
+walk2(gt_tables, seq_along(gt_tables), ~ gtsave(.x, filename = paste0("4_tables/Tabla 3 - Descriptiva PC", .y, ".html")))
+```
+
+Aquí tenemos comparativas en los valores de expresión génica por cada tercil de cada PC. Las hemos sacado en tablas diferentes (`Tabla 3`) y, de acuerdo a los resultados del scree plot, en cada componente vemos que se reduce la variabilidad explicada de manera progresiva a partir de la 2ª y con una drástica diferencia entre la primera y el resto.
+
+***
+# 3.Modelo predictivo Reg.Logística*
+## Introducción
+El objetivo de este análisis es evaluar cómo influyen una serie de variables independientes sobre una variable dependiente. En este caso la variable dependiente es "metástasis", una variable categórica con dos niveles, que determina si los pacientes tienen metástasis o no. Por otro lado, las variables independientes son los cinco componentes principales analizados en el PCA, junto con el resto de variables del dataset original (sin contar con los datos de expresión génica, puesto que ya hemos reducido la dimensionalidad y los tenemos representados con los componentes principales).
+
+Tenemos demasiadas variables independientes por lo que, antes de aplicar la regresión logística, decidimos usar un modelo de regularización, para reducir el número de variables. Al principio, intentamos usar LASSO, un modelo de regularización que aplica una penalización sobre las variables y permite seleccionar solo aquellas variables con un coeficiente que tras la penalización tengan un valor mayor a 0, que son las variables más importantes a la hora de hacer el análisis. Sin embargo, este método salía mal ya que este tipo de regularización eliminaba todas las variables.
+
+La regularización tipo Ridge también fue considerada, ya que no elimina variables pero sí reduce sus coeficientes a valores cercanos a 0, teniendo en cuenta sus efectos pero dándoles poco peso. Este método dejaba nuestro dataset con coeficientes entre órdenes de $10^{-3}$ y $10^{-5}$, pero teníamos tantas variables que preferimos usar ElasticNet (una solución intermedia entre Lasso y Ridge) para evitar sobreajuste o multicolinealidad derivada de variables altamente correlacionadas.
+
+## Preprocesado previo a regularización
+Antes de poder aplicar la regularización, generamos un dataframe con todas las variables (salvo las de expresión génica, que hemos proyectado en un espacio de menor dimensión en forma de componentes) y las convertimos a valores numéricos, ya que es el tipo de dato que necesita las funciones glmnet() y cv.glmnet()
 ```{r}
 # las variables factor están en tipo character, tengo que convertirlas a numérico pq glmnet no admite tipo factor
 # casteo a numérico variables char
@@ -216,34 +314,36 @@ for (i in colnames(df_char)) {
   df_char[[i]] <-as.numeric(as.factor(df_char[[i]]))
 }
 # y concateno df_char, df_nochar y df5 pcs en df_lasso
-df_lasso <- cbind(df_char, df_nochar)
+df_regularizacion <- cbind(df_char, df_nochar)
 
 # ahora tb dejo bien formateada la variable respuesta
 df$metastasis = as.factor(as.numeric(ifelse(df$extension == "metastasico", 1, 0)))
 
 # defino variables para df_lasso
-cols = c(colnames(df_lasso))
-x <- df_lasso[, cols]
+cols = c(colnames(df_regularizacion))
+x <- df_regularizacion[, cols]
 y <- df$metastasis
 
 # convertir a matriz para incluir interacciones entre todas las variables
 #formula <- as.formula(paste("y ~", paste(names(x), collapse = " * "))) # Crear una matriz de diseño con interacciones entre todas las variables
 ```
 
-
-#### ridge
+## Regularización
+### Ridge
 ```{r}
-# construyo un grid para lambda (para el lambda optimo??)
-grid <- 10^seq(1.5, -1.5, length=100)
+set.seed(1456)
+# construimos un grid para encontrar lambda óptimo (el que minimice el error predicho por el modelo vs el dato real)
+grid <- 10^seq(1.5, -1.5, length=100) 
+
+# y aplicamos ridge (alpha=0)
 ridge <- glmnet(x, y, alpha=0, lambda=grid, family="binomial")
 dim(coef(ridge))
 print(coef(ridge))
 
-plot(ridge, label=TRUE) # lambda plot
-plot(ridge, xvar="lambda", label=TRUE) #log lambda plot
+plot(ridge, xvar="lambda", label=TRUE) #log lambda plot > nos permite hacernos una idea de por dónde estará el lambda óptimo
 ```
 
-estos plots nos dan una idea gráfica del valor óptimo de lambda para ridge
+Estos plots nos dan una idea gráfica del valor óptimo de lambda para ridge. Probablemente sea un valor entre $0$ y $10^{2}$.
 ```{r}
 x_matrix <- as.matrix(x)
 y_matrix <- as.matrix(y)
@@ -253,45 +353,64 @@ ridge_cv <- cv.glmnet(x_matrix, y_matrix, alpha=0, lambda=grid, family="binomial
 lambda_min <- ridge_cv$lambda.min # este es el lambda que menor error nos da para el modelo, me lo guardo en un objeto
 # y lo uso para generar modelo de ridge
 ridge_cv <- glmnet(x_matrix, y_matrix, alpha=0, lambda = lambda_min, family="binomial")
-coef(ridge_cv)
+coefs <- as.data.frame(as.matrix(coef(ridge_cv))) %>% tibble::rownames_to_column(var="Var")#guardar coefs en df
+coefs <- coefs[order(-coefs$s0), ] # Ordenar los coeficientes de mayor a menor
+head(coefs, 10) # ver los 10 primeros más significativos
 ```
 
-Todas las variables tienen valores muy bajos... Creo que sería ideal eliminar algunas
+Todas las variables tienen $\beta$s muy bajos y son demasiadas. Aplicamos Lasso para ver si podemos eliminar algunas.
 
-#### lasso
+### Lasso
 ```{r}
+set.seed(1456)
 grid <- 10^seq(-4,1, lenght=100)
 lasso <- glmnet(x, y, alpha=1, lambda=grid, family="binomial")
 dim(coef(lasso))
 print(coef(lasso))
 
-plot(lasso, label=TRUE) # lambda plot
 plot(lasso, xvar="lambda", label=TRUE) #log lambda plot
 ```
 
-estos plots nos dan una idea gráfica del valor óptimo de lambda para ridge
+Estos plots nos dan una idea gráfica del valor óptimo de lambda para Lasso. Ahora vemos que el valor óptimo estará entre $10^{-4}$ y $10^{-2}$.
 ```{r}
 # hago un modelo de cross validation
 grid <- 10^seq(-3,0, lenght=100)
-lasso_cv <- cv.glmnet(x_matrix, y_matrix, alpha=1, lambda=grid, family="binomial")
-plot(lasso_cv)
+lasso <- cv.glmnet(x_matrix, y_matrix, alpha=1, lambda=grid, family="binomial")
+lasso_cv <- glmnet(x_matrix, y_matrix, alpha=1, lambda = lambda_min, family="binomial")
+coefs <- as.data.frame(as.matrix(coef(lasso_cv))) %>% tibble::rownames_to_column(var="Var")#guardar coefs en df
+# Ordenar los coeficientes de mayor a menor y filtrar los que sean 0
+coefs <- coefs[order(-coefs$s0), ] %>% filter(`s0`!=0.000000000000)
+coefs # filtrar los que sean
+head(coefs, 10) # ver los 10 primeros más significativos
 ```
 
-El lambda min me dejará solo una variable (intercepto), pero podemos usar otra regla: en vez de el lambda mínimo, usamos el lambda "within one standard error from the minimum" --> lambda que minimiza el CV error + 1 SE (si no, el valor de lambda mínimo se carga todas las variables)
+Lo que vemos es que el lambda.min (el que minimiza la diferencia $V_{real}-V_{predicha}$) me dejará solo una variable (intercepto), pero podemos usar otra regla: en vez de el lambda mínimo, usamos el lambda "within one standard error from the minimum". Este es el lambda que minimiza el CV error + 1 SE (si no, el valor de lambda mínimo hace se eliminen todas las variables). 
 
+Generamos el nº y lo uso para generar modelo de Lasso.
 ```{r}
-lambda_min <- lasso_cv$lambda.min
-lambda_1se <- lasso_cv$lambda.1se # este es el lambda que menor error nos da para el modelo, me lo guardo en un objeto
-# y lo uso para generar modelo de ridge
-lasso_cv <- glmnet(x, y, alpha=1, lambda = lambda_1se, family="binomial")
-coef(lasso_cv)
+lambda_min <- lasso$lambda.min
+lambda_1se <- lasso$lambda.1se 
+lasso_cv <- glmnet(x_matrix, y_matrix, alpha=1, lambda = lambda_1se, family="binomial")
+coefs <- as.data.frame(as.matrix(coef(lasso_cv))) %>% tibble::rownames_to_column(var="Var")#guardar coefs en df
+# Ordenar los coeficientes de mayor a menor y filtrar los que sean 0
+coefs <- coefs[order(-coefs$s0), ] %>% filter(`s0`!=0.000000000000)
+head(coefs, 10) # ver los 10 primeros más significativos
 ```
 
-#### elastic net
-
+Este lambda también me elimina todas las variables, ya que en realidad es muy cercano al `lambda_min`, lo cual comprobamos a continuación
 ```{r}
-seq_alpha <- seq(0,1,by=0.01)
-grid <- 10^seq(3, -3, length=100) # lo hago de + a - pq el lambda óptimo  es negativo (ver plots iniciales de lasso)
+cat("Lambda min:", lambda_min, "\nLambda + 1SE:", lambda_1se)
+plot(lasso)# este gráfico nos enseña las variables retenidas para los distintos labmda
+```
+
+Los cáculos muestran que $\lambda_{min} = \lambda_{1+S.E.} = 1$. En este gráfico donde vemos los resultados de las distintas CVs y las variables retenidas arriba, un lambda de 1 ($log_{\lambda} = 0$) nos deja un modelo de 0 variables. Además, el lambda mínimo tiene un s.e. muy pequeño que nos dejará otra vez con un modelo con 0 variables y reducir más el lambda nos llevaría a una desviación (error) muy alta, por lo que probaremos con ElasticNet.
+
+
+### ElasticNet
+```{r}
+set.seed(1456)
+seq_alpha <- seq(0.01,0.99,by=0.01) # limitamos el rango para no hacer ni ridge ni lasso
+grid <- 10^seq(-3, 3, length=100) 
 
 best_alpha <- NULL
 best_lambda <- NULL
@@ -316,148 +435,172 @@ cat("Mejor alpha:", best_alpha, "\n")
 cat("Mejor lambda:", best_lambda, "\n")
 ```
 
-
+Ahora que hemos encontrado un alpha intermedio entre Lasso y Ridge, vamos a probar a utilizarlo con `glmnet()` para encontrar el lambda óptimo.
 ```{r ejecutar elasticnet}
 grid <- 10^seq(0, -2, length=100)
 # hago un modelo de cross validation
-enet_cv <- cv.glmnet(x_matrix, y_matrix, alpha=0.67, lambda=grid, family="binomial")
+enet_cv <- cv.glmnet(x_matrix, y_matrix, alpha=best_alpha, lambda=grid, family="binomial")
 plot(enet_cv)
 lambda_1se <- enet_cv$lambda.1se
 lambda_1se
 ```
+En el plot vemos que el lambda mínimo produciría otra vez la eliminación de todas las variables. Sin embargo, en el rango de valores de su SE podemos ver que hay algunos valore de lambda (a partir de $10^{-2}$) donde sí se conservan algunas variables. Viendo también que $\lambda_{+1S.E.}=1=10^{0}$, podremos deducir que esta medida no es buena, por ello hemos escogido arbitrariamente medidas más pequeñas de lambda, para reducir la regularización y conservar ciertas variables que puedan aportar valor predictivo a nuestro modelo. Empezamos con $\lambda=10^{-1}$.
 
 ```{r}
-enet_cv <- glmnet(x_matrix, y_matrix, alpha=0.36, lambda=10^-1, family="binomial")
-coefs_enet <- as.data.frame(as.matrix(coef(enet_cv))) %>% filter(s0!=0)
-coefs_enet <- coefs_enet %>% slice_tail(n = 18) # quitamos el intercept
-reg_vars <- rownames(coefs_enet)
-reg_vars <- reg_vars[reg_vars != "antiemesis"]
+enet_cv <- glmnet(x_matrix, y_matrix, alpha=best_alpha, lambda=10^-1.3, family="binomial")
+coefs_enet <- as.data.frame(as.matrix(coef(enet_cv))) %>% tibble::rownames_to_column(var="Var")#guardar coefs en df
+# ordenamos de manera descendente y filtramos los == 0
+coefs_enet <- coefs_enet[order(-coefs_enet$s0), ] %>% filter(`s0`!=0.000000000000) %>% # quitamos las == 0
+  filter(Var != "(Intercept)") # quitamos el intercept
+coefs_enet
 ```
 
-Variables de regularización están en un vector `reg_vars`.
+Aquí obtenemos 19 coeficientes (más que en Lasso) y con valores más elevados que en Ridge(órdenes de magnitud cercanos a 1), por lo que nos ha parecido un buen resultado para regularizar nuestro dataset.
 
-Una vez seleccionadas las variables del dataset original para el modelo de regresión logística, añadimos también los terciles de los cinco primeros componentes principales, en forma de variables categóricas que indian a qué tercil de cada componente pertenece cada paciente. Para ello, primero se calcularon los terciles de los componentes con la función quantile() y luego se recodificaron las variables de los componentes principales mediante la función cut()
+# 4.Modelo RL
+### Preprocess previo a modelo
+Una vez seleccionadas las variables del dataset original para el modelo de regresión logística (vector `reg_vars`), añadimos también los terciles de los cinco primeros componentes principales, en forma de variables categóricas que indican a qué tercil de cada componente pertenece la expresión de cada gen para un paciente (calculados en el punto 2).
 
 ```{r}
-#Terciles 
-tercilPC1 <- quantile(df_pca$PC1, probs = c(1/3,2/3,1))
-tercilPC2 <- quantile(df_pca$PC2,probs = c(1/3,2/3,1))
-tercilPC3 <- quantile(df_pca$PC3, probs = c(1/3,2/3,1))
-tercilPC4 <- quantile(df_pca$PC4, probs = c(1/3,2/3,1))
-tercilPC5 <- quantile(df_pca$PC5, probs = c(1/3,2/3,1))
-
-df_regresion <- df%>% dplyr::select(reg_vars)
-
-#Variable tercil > forma categorica
-df_regresion$TPC1   <- as.factor(cut(df_pca$PC1, c(-Inf, tercilPC1[1], tercilPC1[2], Inf), labels = c("T1", "T2", "T3")))
-
-df_regresion$TPC2   <- as.factor(cut(df_pca$PC2, c(-Inf, tercilPC2[1], tercilPC2[2], Inf), labels = c("T1", "T2", "T3")))
-
-df_regresion$TPC3   <- as.factor(cut(df_pca$PC3, c(-Inf, tercilPC3[1], tercilPC3[2], Inf), labels = c("T1", "T2", "T3")))
-
-df_regresion$TPC4   <- as.factor(cut(df_pca$PC4, c(-Inf, tercilPC4[1], tercilPC4[2], Inf), labels = c("T1", "T2", "T3")))
-
-df_regresion$TPC5   <- as.factor(cut(df_pca$PC5, c(-Inf, tercilPC5[1], tercilPC5[2], Inf), labels = c("T1", "T2", "T3")))
-
+reg_vars <- c(coefs_enet$Var) # Guardamos variables de elasticnet en vectror
+df_regresion <- df_regularizacion %>% dplyr::select(all_of(reg_vars <- c(coefs_enet$Var))) # creamos df_regresion (vacío)
 #Tambien hay que añadir la variable categorica
 df_regresion$metastasis <- as.factor(df$metastasis)
 
-#El resto de variables categoricas hay que pasarlas a factor
-df_regresion$sexo <- as.factor(df_regresion$sexo)
-df_regresion$ETE <- as.factor(df_regresion$ETE)
-df_regresion$neumopatia <- as.factor(df_regresion$neumopatia)
-df_regresion$hepatopatia <- as.factor(df_regresion$hepatopatia)
-df_regresion$ITU <- as.factor(df_regresion$ITU)
-df_regresion$renal  <- as.factor(df_regresion$renal)
-df_regresion$neuropatia <- as.factor(df_regresion$neuropatia)
-df_regresion$corticoides <- as.factor(df_regresion$corticoides)
-df_regresion$secrecion <- as.factor(df_regresion$secrecion)
-df_regresion$dolor_garg <- as.factor(df_regresion$dolor_garg)
-df_regresion$anosmia <- as.factor(df_regresion$anosmia)
-df_regresion$dolor_abdo <- as.factor(df_regresion$dolor_abdo)
-
+# Convertimos las variables en tipo factor
+for (var in reg_vars) { 
+  if (var %in% colnames(df_char)) { # castear solo las que esten en df_char, que son las tipo factor
+    df_regresion[[var]] <- as.factor(df_regresion[[var]])
+  }}
 ```
 
 Una vez tuvimos en un dataframe todas las variables del dataset original que hemos seleccionado para la regresion logística, junto con los terciles de los cinco primeros componentes codificados en forma de factor, hicimos la regresión logística:
 
+### modelo RL 1
 ```{r}
-reg_vars <- c(reg_vars, "TPC1", "TPC2", "TPC3","TPC4","TPC5")
-formula <- as.formula(paste("metastasis ~", paste(reg_vars, collapse = "+")))
+df_regresion <- cbind(df_regresion, df_pca_scores[6:10]) #añadimos al dataframe de regresion los terciles de las PCs
+reg_vars <- colnames(df_regresion) #guardo colnames en un vector
+reg_vars_x <- setdiff(reg_vars, "metastasis")
+formula <- as.formula(paste("metastasis ~", paste(reg_vars_x, collapse = "+")))
 
 modelo_regresion <- glm(formula, data = df_regresion, family = "binomial")
+
+cat("ODDS RATIOS\n")
+exp(coef(modelo_regresion)) #OR
+cat("\nICs\n")
+head(exp(confint(modelo_regresion)), 10) # ver primeros 10 ICs
+cat("\nMODEL SUMMARY\n")
+rl_summary <- summ(modelo_regresion) #pvalores
+rl_summary$coeftable
 ```
 
 Para poder interpretar los resultados del modelo de regresión logística, necesitamos sacar los Odds-Ratios (OR), ya que los coeficientes no son directamente interpretables. Para ello, hay que obtener la forma exponencial de dichos coeficientes. En estos OR, lo que se obtiene es el efecto, positivo o negativo, que las variables independientes tienen sobre la clase de interés de la variable dependiente (en este caso, 1, es decir, tener metástasis) con respecto a la clase de referencia (en este caso 0, es decir, no tener metástasis). También hay que tener en cuenta si este efecto es significativo o no, lo cual se puede saber a través del pvalor o analizando los intervalos de confianza. 
 
 ```{r}
-exp(coef(modelo_regresion)) #OR
-exp(confint(modelo_regresion))
-summ(modelo_regresion) #pvalor
-
 #Salen cosas muy raras, vamos a ver la colinealidad 
-vif(modelo_regresion)
+vif <- as.data.frame(vif(modelo_regresion))
+vif <- vif[order(-vif$`GVIF^(1/(2*Df))`), ]
+cat("MODELO 1")
+head(vif, 10)
+```
 
+### modelo RL 2
+```{r}
 #habria que quitar aquellas variables con un VIF mayor de 5, como sexo, neumopatia, neuropatia, coticoides, secrecion, dolo_abdio, chol, hierro, igN, cpk (realmente los terciles tambien tienen colinealidad pero es raro porque se suponen que vienen de un PCA)
-
-variables_a_eliminar <- c("sexo", "neumopatia", "neuropatia", "corticoides", "secrecion", "dolor_abdo", "chol", "hierro", "igN", "cpk")
+variables_a_eliminar <- c("TPC1", "neumopatia", "neuropatia", "corticoides", "secrecion", "dolor_abdo", "chol", "hierro", "igN", "cpk")
 
 # Eliminar las variables específicas de la fórmula
-reg_vars_modificadas <- setdiff(reg_vars, variables_a_eliminar)
+reg_vars_modificadas <- setdiff(reg_vars_x, variables_a_eliminar)
+# Deseleccionar del df
+df_regresion_2 <- df_regresion[, reg_vars_modificadas]
 
 # Crear la nueva fórmula con las variables modificadas
-
 formula_modificada <- as.formula(paste("metastasis ~", paste(reg_vars_modificadas, collapse = "+")))
-
 
 modelo_regresion2 <- glm(formula_modificada, data = df_regresion, family = "binomial")
 
-summ(modelo_regresion2) #ahora salen cosas mas normales
-exp(confint(modelo_regresion2))
-
-vif(modelo_regresion2) #ahora ya no hay tanto problema de colinealidad, aunque algunas variables siguen sin salir bien del todo. 
-
+# Ver resultados
+cat("ODDS RATIOS\n")
+exp(coef(modelo_regresion2)) #OR
+cat("\nICs\n")
+round(exp(confint(modelo_regresion2)), 2) # ver primeros 10 ICs
+#cat("\nMODEL SUMMARY\n")
+#rl_summary_2 <- summ(modelo_regresion2) #pvalores
+#rl_summary_2$coeftable
+cat("\nVIF\n")
+vif2 <- as.data.frame(vif(modelo_regresion2))
+vif2 <- vif2[order(-vif2$`GVIF^(1/(2*Df))`), ]
+head(vif2, 10)
 ```
 
-
-Ahora hay que calcular terciles de las PCs (`df_5pcs`)
+Las variables sociodemográficas no salen significativas, por lo que pueden aportar ruido al modelo. Ajustamos un último modelo solo con las PCs.
+### modelo RL 3
 ```{r}
-for (i in )
+# Eliminar las variables específicas de la fórmula
+reg_vars_modificadas_2 <- c(colnames(df_pca_scores[6:10]))
+# Deseleccionar del df
+df_regresion_3 <- df_regresion[, reg_vars_modificadas_2]
+
+# Crear la nueva fórmula con las variables modificadas
+formula_modificada_2 <- as.formula(paste("metastasis ~", paste(reg_vars_modificadas_2, collapse = "+")))
+
+modelo_regresion3 <- glm(formula_modificada_2, data = df_regresion, family = "binomial")
+
+# Ver resultados
+cat("ODDS RATIOS\n")
+exp(coef(modelo_regresion3)) #OR
+cat("\nICs\n")
+round(exp(confint(modelo_regresion3)), 2) # ver primeros 10 ICs
+#cat("\nMODEL SUMMARY\n")
+#rl_summary_2 <- summ(modelo_regresion2) #pvalores
+#rl_summary_2$coeftable
+cat("\nVIF\n")
+vif3 <- as.data.frame(vif(modelo_regresion3))
+vif3 <- vif3[order(-vif3$`GVIF^(1/(2*Df))`), ]
+vif3
 ```
 
 
-# 4.Tabla descriptiva
+
+***
+# 5.Tabla descriptiva del modelo
+### t3-iles ORs
 ```{r}
-for (i)
+# Asumiendo que ya tienes un modelo ajustado llamado modelo_logit
+# Extraer coeficientes
+coeficientes <- coef(modelo_regresion3) 
+
+# Calcular Odds Ratios
+odds_ratios <- as.data.frame(exp(coeficientes)) %>% tibble::rownames_to_column(var="Var")
+
+intercept <- odds_ratios[1, ]
+
+or_pc1 <- odds_ratios[1:3, ]
+or_pc1$PC = "PC1"
+or_pc2 <- rbind(intercept, odds_ratios[4:5, ])
+or_pc2$PC = "PC2"
+or_pc3 <- rbind(intercept, odds_ratios[6:7, ])
+or_pc3$PC = "PC3"
+or_pc4 <- rbind(intercept, odds_ratios[8:9, ])
+or_pc4$PC = "PC4"
+or_pc5 <- rbind(intercept, odds_ratios[10:11, ])
+or_pc5$PC = "PC5"
+
+OR_d_table <- rbind(or_pc1, or_pc2, or_pc3, or_pc4, or_pc5)
+gt(OR_d_table)
 ```
 
+# PENDIENTE
+- columna Var: renombrar como columna tercil y as.factor()
+-- Intercept = t1
+-- para cada var:
+---- TPCxt2 = t2
+---- TPCxt3 = t3
 
-variables dummy
-$$
-baseline = T1 \rightarrow\text{para los 5 PCs} \\
+- añadir pvalue como nueva columna a la derecha de coeficientes --> están en rl_summary_2$coeftable
 
-metastasis = PC1T2\times\beta_{PC1T2} + PC1T3\times\beta_{PC1T3} + \\
-PC2T2\times\beta_{PC1T2} + PC2T3\times\beta_{PC1T3} + \\
-PC3T2\times\beta_{PC1T2} + PC3T3\times\beta_{PC1T3} + \\
-PC4T2\times\beta_{PC1T2} + PC4T3\times\beta_{PC1T3} + \\
-PC5T2\times\beta_{PC1T2} + PC5T3\times\beta_{PC1T3}
-$$
-```
+- añadir nuevas columnas con IC 95% --> están en rl_summary_2$coeftable
 
+- una vez hecho esto, crear última tabla
 
-```{r}
-
-
-
-
-
-## terciles PCs
-```{r}
-# terciles PC1 --> factor var
-df_rlog$`Terciles PC1` <- quantile()
-
-# terciles PC2 (lo mismo que antes)
-# terciles PC3 (lo mismo que antes)
-# terciles PC4 (lo mismo que antes)
-# terciles PC5 (lo mismo que antes)
-```
-
+- en gráficas de `### B-Analiza variables y PCs`, en la gráfica que son 4 en 1 y se ve mal, dejar comentario explicando que en .html se verá mal pero que si la abren en Rmd (y la visualizan en el popup), se verá mejor ya que el tamaño se autoajusta
