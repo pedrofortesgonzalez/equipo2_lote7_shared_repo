@@ -582,14 +582,88 @@ Analizando los ICs, solamente el TPC4t3 (segundo tercer del componente principal
 
 ***
 # 5.Tabla descriptiva del modelo
-### t3-iles ORs
+## Manualmente
+Usamos las librerías `broom` y `stringr`
+```{r}
+# Cargar librerías necesarias
+library(broom)
+library(stringr)
+# Asumiendo que 'modelo' es tu objeto de glm
+df_ors <- as.data.frame(tidy(modelo_regresion3, exponentiate = TRUE, conf.int=TRUE))  # Esto te da un dataframe con los términos, estimaciones, etc.
+# separar df_ors$term en PC y Tercil
+matches <- stringr::str_match(df_ors$term, "^(?:T)(PC\\d)(t\\d)$")
+df_ors[c("PC", "Tercil")] <- matches[,2:3]
+df_ors[1, 8:9] = c("PC5", "t1")
+# repetir fila del intercept 4 veces (5 copias, 5 PCs)
+copias_pcs <- df_ors[rep(1,4), ]
+copias_pcs[1:4, 8] = c("PC1", "PC2", "PC3", "PC4")
+df_ors <- rbind(copias_pcs, df_ors)
+
+# juntar df$estimate, df$conf.low y df$conf.high
+df_ors$estimate <- as.character(round(df_ors$estimate, 2))
+df_ors$conf.low <- as.character(round(df_ors$conf.low, 2))
+df_ors$conf.high <- as.character(round(df_ors$conf.high, 2))
+df_ors$OR = str_c(df_ors$estimate, " (", 
+                  df_ors$conf.low, " - ", 
+                  df_ors$conf.high, ")")
+
+# eliminar variables que no quiero
+vars_2_erase <- c("std.error", "statistic", "estimate", "conf.low", "conf.high", "term")
+df_ors <- df_ors %>% dplyr::select(-all_of(vars_2_erase))
+
+
+# pasar datos a formato wide
+df_wide <- df_ors %>%
+  pivot_wider(names_from = Tercil, 
+    values_from = c(OR, p.value),
+    names_sep = " ") %>%
+  as.data.frame()
+
+df_wide$PC = c("PC 1", "PC 2", "PC 3", "PC 4", "PC 5") 
+df_wide <- df_wide %>% dplyr::select("PC", 
+              "OR t1", "p.value t1", 
+              "OR t2", "p.value t2", 
+              "OR t3", "p.value t3")
+
+
+# Ver el resultado
+gt(df_wide)
+```
+
+
+#### Otras funciones de broom
+```{r}
+tidy(modelo_regresion3)
+glance(modelo_regresion3)
+augment(modelo_regresion3)
+```
+
+
+## Pedro: t3-iles ORs
+En esta versión, si fuésemos capaces de añadir los intervalos de confianza y pvalores, podríamos usar `tbl_regression()` pero veo problemas con el formato
+
+Documentation: https://www.danieldsjoberg.com/gtsummary/articles/tbl_regression.html
+https://www.danieldsjoberg.com/gtsummary/reference/tbl_regression.html 
+https://www.rdocumentation.org/packages/gtsummary/versions/1.2.0/topics/tbl_regression 
+https://www.danieldsjoberg.com/gtsummary-weill-cornell-presentation/#38 
+
+- añadir pvalue como nueva columna a la derecha de coeficientes --> están en rl_summary_2$coeftable
+- añadir nuevas columnas con IC 95% --> están en rl_summary_2$coeftable
+
 ```{r}
 # Asumiendo que ya tienes un modelo ajustado llamado modelo_logit
 # Extraer coeficientes
-coeficientes <- coef(modelo_regresion3) 
+coeficientes <- coef(modelo_regresion3)
 
 # Calcular Odds Ratios
 odds_ratios <- as.data.frame(exp(coeficientes)) %>% tibble::rownames_to_column(var="Var")
+
+rl_summary_3 <- summary(modelo_regresion_3)
+rl_summary_3$coeftable#aquí están los pvalues y los IC95%
+```
+
+
+```{r}
 intercept <- odds_ratios[1, ]
 
 or_pc1 <- odds_ratios[1:3, ]
@@ -604,9 +678,16 @@ or_pc5 <- rbind(intercept, odds_ratios[10:11, ])
 or_pc5$PC = "PC5"
 
 OR_d_table <- rbind(or_pc1, or_pc2, or_pc3, or_pc4, or_pc5)
+OR_d_table = OR_d_table %>% dplyr::rename(Tercil = Var)
+OR_d_table$Tercil = as.factor(OR_d_table$Tercil)
+levels(OR_d_table$Tercil) = list(
+  T1 = "(Intercept)", 
+  T2 = c("TPC1t2", "TPC2t2", "TPC3t2", "TPC4t2", "TPC5t2"), 
+  T3 = c("TPC1t3", "TPC2t3", "TPC3t3", "TPC4t3", "TPC5t3"))
 gt(OR_d_table)
 ```
 
+## Cris
 Aqui estaba probando cosas, pero no me sale nada con sentido
 ```{r}
 
@@ -643,16 +724,6 @@ tabla
 
 ```
 
-# PENDIENTE
-- columna Var: renombrar como columna tercil y as.factor()
--- Intercept = t1
--- para cada var:
----- TPCxt2 = t2
----- TPCxt3 = t3
 
-- añadir pvalue como nueva columna a la derecha de coeficientes --> están en rl_summary_2$coeftable
 
-- añadir nuevas columnas con IC 95% --> están en rl_summary_2$coeftable
-
-- una vez hecho esto, crear última tabla
 
