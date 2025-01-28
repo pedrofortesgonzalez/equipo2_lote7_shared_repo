@@ -337,7 +337,7 @@ y <- df$metastasis
 ## Regularización
 ### Ridge
 
-Primeramente, se testearon con la función glmnet() diferentes valores de lambda estabelcidos previamente en la variable grid. Al graficar estos valores de lambda, pudimos orientar entorno a qué rango de valores se encontraba el lambda óptimo. 
+Primeramente, se testearon con la función glmnet() diferentes valores de lambda establecidos previamente en la variable grid. Al graficar estos valores de lambda, pudimos orientar entorno a qué rango de valores se encontraba el lambda óptimo. 
 Con esta información, ajustamos el rango del grid y usamos cv.glmnet() para calcular el lambda óptimo y con ello, usar la función glmnet() y calcular los coeficientes de las variables con el modelo de Ridge. 
 
 ```{r}
@@ -415,7 +415,7 @@ cat("Lambda min:", lambda_min, "\nLambda + 1SE:", lambda_1se)
 plot(lasso)# este gráfico nos enseña las variables retenidas para los distintos labmda
 ```
 
-Los cáculos muestran que $\lambda_{min} = \lambda_{1+S.E.} = 1$. En este gráfico donde vemos los resultados de las distintas CVs y las variables retenidas arriba, un lambda de 1 ($log_{\lambda} = 0$) nos deja un modelo de 0 variables. Además, el lambda mínimo tiene un s.e. muy pequeño que nos dejará otra vez con un modelo con 0 variables y reducir más el lambda nos llevaría a una desviación (error) muy alta, por lo que probaremos con ElasticNet.
+Los cálculos muestran que $\lambda_{min} = \lambda_{mín+1 S.E.} = 1$. En este gráfico donde vemos los resultados de las distintas CVs y las variables retenidas arriba, un lambda de 1 ($log_{\lambda} = 0$) nos deja un modelo de 0 variables. Además, el lambda mínimo tiene un s.e. muy pequeño que nos dejará otra vez con un modelo con 0 variables a pesar de usar el $\lambda_{mín+1 S.E.}$ y reducir más el lambda nos llevaría a una desviación (error) muy alta, por lo que probaremos con ElasticNet.
 
 
 ### ElasticNet
@@ -473,7 +473,7 @@ Aquí obtenemos 19 coeficientes (más que en Lasso) y con valores más elevados 
 
 # 4.Modelo RL
 ### Preprocesado previo a modelo
-Una vez seleccionadas las variables del dataset original para el modelo de regresión logística (vector `reg_vars`), añadimos también los terciles de los cinco primeros componentes principales, en forma de variables categóricas que indican a qué tercil de cada componente pertenece la expresión de cada gen para un paciente (calculados en el punto 2).
+Una vez seleccionadas las variables del dataset original para el modelo de regresión logística (vector `reg_vars`), añadimos también los terciles de los cinco primeros componentes principales, en forma de variables dummy que indican a qué tercil de cada componente pertenece la expresión de cada gen para un paciente (calculados en el punto 2).
 
 ```{r}
 reg_vars <- c(coefs_enet$Var) # Guardamos variables de elasticnet en vectror
@@ -550,7 +550,7 @@ vif2 <- as.data.frame(vif(modelo_regresion2))
 vif2 <- vif2[order(-vif2$`GVIF^(1/(2*Df))`), ]
 head(vif2, 10)
 ```
-Aunque ahora ya no hay alta colinealidad, analizando los intervalos de confianza, se aprecia que la influencia al modelo de las variables sociodemográficas no es significativa, por lo que probablmente solo aportan ruido al modelo. Por ello, ajustamos  un último modelo solo con los terciles de los cinco primeros componentes principales:
+Aunque ahora ya no hay alta colinealidad, analizando los intervalos de confianza, se aprecia que la influencia al modelo de las variables sociodemográficas no es significativa ya que todos cruzan el 1, por lo que probablmente solo aportan ruido al modelo. Por ello, ajustamos  un último modelo solo con los terciles de los cinco primeros componentes principales:
 
 ### modelo RL 3
 ```{r}
@@ -582,17 +582,18 @@ Analizando los ICs, solamente el TPC4t3 (segundo tercer del componente principal
 
 ***
 # 5.Tabla descriptiva del modelo
-## Manualmente
+## Opción 1: broom y stringr
 Usamos las librerías `broom` y `stringr`
 ```{r}
 # Cargar librerías necesarias
 library(broom)
 library(stringr)
-# Asumiendo que 'modelo' es tu objeto de glm
-df_ors <- as.data.frame(tidy(modelo_regresion3, exponentiate = TRUE, conf.int=TRUE))  # Esto te da un dataframe con los términos, estimaciones, etc.
+# Esto te da un dataframe con los términos, estimaciones, etc.
+df_ors <- as.data.frame(tidy(modelo_regresion3, exponentiate = TRUE, conf.int=TRUE))  
+
 # separar df_ors$term en PC y Tercil
 matches <- stringr::str_match(df_ors$term, "^(?:T)(PC\\d)(t\\d)$")
-df_ors[c("PC", "Tercil")] <- matches[,2:3]
+df_ors[c("Variable", "Tercil")] <- matches[,2:3]
 df_ors[1, 8:9] = c("PC5", "t1")
 # repetir fila del intercept 4 veces (5 copias, 5 PCs)
 copias_pcs <- df_ors[rep(1,4), ]
@@ -607,6 +608,7 @@ df_ors$OR = str_c(df_ors$estimate, " (",
                   df_ors$conf.low, " - ", 
                   df_ors$conf.high, ")")
 
+
 # eliminar variables que no quiero
 vars_2_erase <- c("std.error", "statistic", "estimate", "conf.low", "conf.high", "term")
 df_ors <- df_ors %>% dplyr::select(-all_of(vars_2_erase))
@@ -619,111 +621,28 @@ df_wide <- df_ors %>%
     names_sep = " ") %>%
   as.data.frame()
 
-df_wide$PC = c("PC 1", "PC 2", "PC 3", "PC 4", "PC 5") 
-df_wide <- df_wide %>% dplyr::select("PC", 
-              "OR t1", "p.value t1", 
-              "OR t2", "p.value t2", 
-              "OR t3", "p.value t3")
+# definir valores de "Variable"
+df_wide$Variable = c("PC 1", "PC 2", "PC 3", "PC 4", "PC 5") 
+# Ordenar variables
+df_wide <- df_wide %>% dplyr::select("Variable", 
+                                     "OR t1", "p.value t1", 
+                                     "OR t2", "p.value t2", 
+                                     "OR t3", "p.value t3")
 
-
+# redondear vaor de pvalue
+df_wide$`p.value t1` = round(df_wide$`p.value t1`, 2)
+df_wide$`p.value t2` = round(df_wide$`p.value t2`, 2)
+df_wide$`p.value t3` = round(df_wide$`p.value t3`, 2)
 # Ver el resultado
+library(gt)
 gt(df_wide)
 ```
 
 
-#### Otras funciones de broom
+## Opción 2: gtsummary
+Con `gtsummary()` solo hemos sido capaces de hacer la tabla de la siguiente manera (sin dividir por terciles y sin poner las ORs de los terciles 1, que son los valores del término `Intercept`).
 ```{r}
-tidy(modelo_regresion3)
-glance(modelo_regresion3)
-augment(modelo_regresion3)
+tabla_df <- modelo_regresion3 %>% tbl_regression(exponentiate=TRUE)
+tabla_df
 ```
-
-
-## Pedro: t3-iles ORs
-En esta versión, si fuésemos capaces de añadir los intervalos de confianza y pvalores, podríamos usar `tbl_regression()` pero veo problemas con el formato
-
-Documentation: https://www.danieldsjoberg.com/gtsummary/articles/tbl_regression.html
-https://www.danieldsjoberg.com/gtsummary/reference/tbl_regression.html 
-https://www.rdocumentation.org/packages/gtsummary/versions/1.2.0/topics/tbl_regression 
-https://www.danieldsjoberg.com/gtsummary-weill-cornell-presentation/#38 
-
-- añadir pvalue como nueva columna a la derecha de coeficientes --> están en rl_summary_2$coeftable
-- añadir nuevas columnas con IC 95% --> están en rl_summary_2$coeftable
-
-```{r}
-# Asumiendo que ya tienes un modelo ajustado llamado modelo_logit
-# Extraer coeficientes
-coeficientes <- coef(modelo_regresion3)
-
-# Calcular Odds Ratios
-odds_ratios <- as.data.frame(exp(coeficientes)) %>% tibble::rownames_to_column(var="Var")
-
-rl_summary_3 <- summary(modelo_regresion_3)
-rl_summary_3$coeftable#aquí están los pvalues y los IC95%
-```
-
-
-```{r}
-intercept <- odds_ratios[1, ]
-
-or_pc1 <- odds_ratios[1:3, ]
-or_pc1$PC = "PC1"
-or_pc2 <- rbind(intercept, odds_ratios[4:5, ])
-or_pc2$PC = "PC2"
-or_pc3 <- rbind(intercept, odds_ratios[6:7, ])
-or_pc3$PC = "PC3"
-or_pc4 <- rbind(intercept, odds_ratios[8:9, ])
-or_pc4$PC = "PC4"
-or_pc5 <- rbind(intercept, odds_ratios[10:11, ])
-or_pc5$PC = "PC5"
-
-OR_d_table <- rbind(or_pc1, or_pc2, or_pc3, or_pc4, or_pc5)
-OR_d_table = OR_d_table %>% dplyr::rename(Tercil = Var)
-OR_d_table$Tercil = as.factor(OR_d_table$Tercil)
-levels(OR_d_table$Tercil) = list(
-  T1 = "(Intercept)", 
-  T2 = c("TPC1t2", "TPC2t2", "TPC3t2", "TPC4t2", "TPC5t2"), 
-  T3 = c("TPC1t3", "TPC2t3", "TPC3t3", "TPC4t3", "TPC5t3"))
-gt(OR_d_table)
-```
-
-## Cris
-Aqui estaba probando cosas, pero no me sale nada con sentido
-```{r}
-
-#A mi se me habia ocurrido esto, pero hay que pulirlo 
-# Cálculo de los terciles
-terciles_OR <- quantile(odds_ratios$`exp(coeficientes)`, probs = c(1/3, 2/3))
-odds_ratios$terciles <- cut(
-  odds_ratios$`exp(coeficientes)`, 
-  breaks = c(0, terciles_OR[1], terciles_OR[2], Inf), 
-  labels = c("T1", "T2", "T3")
-)
-
-# Calcular intervalos de confianza del modelo
-ICs <- as.data.frame(exp(confint(modelo_regresion3))) #esto para añadir los ICs, pero aun sigo pensando como
-
-
-tabla <- odds_ratios %>%
-  tbl_summary(
-    by = terciles,
-    statistic = list(
-      all_continuous() ~ "{p50} ({p25} - {p75})"
-    )
-  ) %>%
-  add_p(
-    test = list(all_continuous() ~ "kruskal.test"),
-    pvalue_fun = ~ style_pvalue(.x, digits = 3)
-  )
-
-tabla
-
-
-
-#Quedaria añadir el intervalo de confianza
-
-```
-
-
-
 
