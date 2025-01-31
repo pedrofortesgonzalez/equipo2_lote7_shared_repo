@@ -81,7 +81,7 @@ fviz_eig(pca.result, addlabels = TRUE)
 
 En el gráfico, se observa que  el allanamiento de la gráfica ocurre en el segundo componente, ya que el componente principal explica gran parte de la varianza (52,5%) y el resto de componentes aportan mucha menos varinza. Sin embargo, como consideramos importante llegar a un 70% de varianza, decidimos trabajar con los cinco primeros componentes principales. 
 
-### B-Analiza variables y PCs
+### B-Analizar variables y PCs
 Podemos representar en dos dimensiones las variables del dataset, en forma de vectores cuya longitud indica la fuerza con la que las variables constribuyen a cada dimensión y cuya dirección indica si la asociación es positiva o negativa. 
 Además, podemos establecer un código de colores, de modo que se represente simultáneamente el parámetro `cos2`. Este parámetro indica qué tan bien están representadas las variables por los componentes principales, en otras palabras, establece cómo de bien "caben" las variables en el espacio de menor dimensión. 
 ```{r}
@@ -147,7 +147,7 @@ pca_loadings_exp <- pca_loadings %>% mutate(across(.cols = -Gene, # para toda co
                 ~ ifelse(. < 0.1, sprintf("%.1e", .), sprintf("%.2f", .)))) # redondeamos a 1 decimal y escribimos en notación científica si son < 0.1, también con un decimal
 
 # guardamos el df como objeto gt y exportamos para visualizar en Anexo
-#gtsave(gt(pca_loadings_exp), filename = "4_tables/Tabla 2 - PCA Cargas.html") # guardar html
+gtsave(gt(pca_loadings_exp), filename = "Tabla 2 - PCA Cargas.html") # guardar html
 ```
 
 ### C-Analizar individuos y PCs
@@ -284,9 +284,9 @@ result_list <- map2(strata_vars, by_vars, ~ {
 # Convertir cada tabla en result_list a gt
 gt_tables <- map(result_list, as_gt)
 # Imprimir cada tabla individualmente (guardadas en documento adjunto)
-#walk(gt_tables, print)
+#walk(gt_tables, print) #No ejecutar en el html
 # Guardar cada tabla individualmente como .html
-#walk2(gt_tables, seq_along(gt_tables), ~ gtsave(.x, filename = paste0("4_tables/Tabla 3 - Descriptiva PC", .y, ".html")))
+#walk2(gt_tables, seq_along(gt_tables), ~ gtsave(.x, filename = paste0("Tabla 3 - Descriptiva PC", .y, ".html"))) #No ejecutar en el html
 ```
 
 Aquí tenemos comparativas en los valores de expresión génica por cada tercil de cada PC. Las hemos sacado en tablas diferentes (`Tabla 3`) y, de acuerdo a los resultados del scree plot, en cada componente vemos que se reduce la variabilidad explicada de manera progresiva a partir de la 2ª y con una drástica diferencia entre la primera y el resto.
@@ -331,7 +331,7 @@ x <- df_regularizacion[, cols]
 y <- df$metastasis
 
 # convertir a matriz para incluir interacciones entre todas las variables
-#formula <- as.formula(paste("y ~", paste(names(x), collapse = " * "))) # Crear una matriz de diseño con interacciones entre todas las variables
+formula <- as.formula(paste("y ~", paste(names(x), collapse = " * "))) # Crear una matriz de diseño con interacciones entre todas las variables
 ```
 
 ## Regularización
@@ -348,7 +348,7 @@ grid <- 10^seq(1.5, -1.5, length=100)
 # y aplicamos ridge (alpha=0)
 ridge <- glmnet(x, y, alpha=0, lambda=grid, family="binomial")
 dim(coef(ridge))
-print(coef(ridge))
+head(coef(ridge))
 
 plot(ridge, xvar="lambda", label=TRUE) #log lambda plot > nos permite hacernos una idea de por dónde estará el lambda óptimo
 ```
@@ -550,7 +550,7 @@ vif2 <- as.data.frame(vif(modelo_regresion2))
 vif2 <- vif2[order(-vif2$`GVIF^(1/(2*Df))`), ]
 head(vif2, 10)
 ```
-Aunque ahora ya no hay alta colinealidad, analizando los intervalos de confianza, se aprecia que la influencia al modelo de las variables sociodemográficas no es significativa ya que todos cruzan el 1, por lo que probablmente solo aportan ruido al modelo. Por ello, ajustamos  un último modelo solo con los terciles de los cinco primeros componentes principales:
+Aunque ahora ya no hay alta colinealidad, analizando los intervalos de confianza, se aprecia que la influencia al modelo de las variables sociodemográficas no es significativa ya que todos cruzan el 1, por lo que probablemente solo aportan ruido al modelo. Por ello, ajustamos  un último modelo solo con los terciles de los cinco primeros componentes principales:
 
 ### modelo RL 3
 ```{r}
@@ -636,6 +636,7 @@ df_wide$`p.value t3` = round(df_wide$`p.value t3`, 2)
 # Ver el resultado
 library(gt)
 gt(df_wide)
+gtsave(gt(df_wide), filename = "Tabla 4 - Tabla de regresión Logística.html")#guardar html
 ```
 
 
